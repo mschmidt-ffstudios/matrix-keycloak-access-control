@@ -2,7 +2,7 @@
 
 A free and open-source reference implementation maintained by **Foldfence Studios**. It demonstrates Keycloak sign-in, policy-controlled Matrix rooms and direct chats, end-to-end encrypted messages and files, calls, and scoped OrgBot export.
 
-**[English documentation](README.en.md) · [Deutsche Dokumentation](README.de.md)**
+**[Install and run](README.en.md#prepare-and-start) · [English documentation](docs/README.md) · [Deutsch](README.de.md)**
 
 ## Keycloak setup in the UI
 

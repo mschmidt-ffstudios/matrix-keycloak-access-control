@@ -2,7 +2,7 @@
 
 Eine freie und quelloffene Referenzbereitstellung, gepflegt von **Foldfence Studios**. Sie zeigt Keycloak-Identitäten, Matrix-Raum- und Direktchat-Policies, verschlüsselte Nachrichten und Dateien, Anrufe und begrenzten Export. Die Demo verwendet einen Realm und einen Homeserver.
 
-[English](README.en.md) · [Dokumentationsübersicht](docs/README.md) · [Release Notes](docs/RELEASE-NOTES.md)
+[Startanleitung](#vorbereiten-und-starten) · [Dokumentationsübersicht (Englisch)](docs/README.md) · [Release Notes (Englisch)](docs/RELEASE-NOTES.md) · [English](README.en.md)
 
 ## Keycloak-Einrichtung in der Oberfläche
 

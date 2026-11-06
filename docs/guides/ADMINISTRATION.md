@@ -22,14 +22,14 @@ The generator's realm and issuer default is `foldfence-demo`, and the management
 
 ## Room catalog and roles
 
-The clearance attribute accepts exactly these values and ranks:
+Use these exact clearance values in Keycloak and configuration. The English labels explain the demo values.
 
-| Clearance | Rank |
-| --- | ---: |
-| `basis` | 0 |
-| `intern` | 1 |
-| `vertraulich` | 2 |
-| `streng_vertraulich` | 3 |
+| Clearance value | English label | Rank |
+| --- | --- | ---: |
+| `basis` | Basic | 0 |
+| `intern` | Internal | 1 |
+| `vertraulich` | Confidential | 2 |
+| `streng_vertraulich` | Strictly confidential | 3 |
 
 The checked-in policy currently defines these ten managed rooms:
 

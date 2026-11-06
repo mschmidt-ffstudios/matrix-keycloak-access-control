@@ -2,7 +2,7 @@
 
 A free and open-source reference deployment maintained by **Foldfence Studios**. It demonstrates Keycloak identity, Matrix room and direct-chat policies, encrypted messages and files, calls, and scoped export. It uses one Keycloak realm and one Matrix homeserver.
 
-[Deutsch](README.de.md) · [Documentation map](docs/README.md) · [Release notes](docs/RELEASE-NOTES.md)
+[Install and run](#prepare-and-start) · [Documentation map](docs/README.md) · [Release notes](docs/RELEASE-NOTES.md) · [Deutsch](README.de.md)
 
 ## Keycloak setup in the UI
 
@@ -64,13 +64,13 @@ Preparation derives service URLs from `.env`. Keep hostname, port and TLS settin
 
 Grant `matrix-access` explicitly to a Matrix user. Room roles and direct-chat groups remain independent additional permissions. A new CLI-created user is unentitled unless `--matrix-access` is supplied. Keycloak-only administrators use the management console rather than the Messenger.
 
-| Room | Minimum clearance | Roles |
+| Demo room | Minimum clearance | Roles |
 | --- | --- | --- |
-| Allgemein | `basis` | `reader`, `writer`, `moderator` |
+| General (Allgemein) | `basis` | `reader`, `writer`, `moderator` |
 | Pummel | `intern` | same |
-| Speicher | `vertraulich` | same |
-| Leitung | `streng_vertraulich` | same |
-| Abteilung X / Y | `basis` | same, with explicit department role |
+| Storage (Speicher) | `vertraulich` | same |
+| Leadership (Leitung) | `streng_vertraulich` | same |
+| Departments X and Y (Abteilung X / Y) | `basis` | same, with explicit department role |
 
 `reader` is power 0, `writer` is 10, and `moderator` is 50. The policy service controls membership and protected room state. Clearance labels govern admission. All managed rooms use the same E2EE algorithm. A direct chat requires a shared exact group ID in the `1to1chat.*` namespace. OrgBot is an additional, read-only E2EE participant.
 
