@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "brand": {
+    "organization_name": "Organization Demo",
+    "product_name": "Organization Messenger",
+    "short_name": "Messenger",
+    "tagline": "Secure organizational communication",
+    "support_url": "",
+    "logo_wide": "assets/logo-wide.svg",
+    "logo_mark": "assets/logo-mark.svg",
+    "login_background": "",
+    "colors": {
+      "primary": "#146B8C",
+      "accent": "#B4D334",
+      "background": "#0B2034",
+      "text": "#FFFFFF"
+    }
+  },
+  "targets": {
+    "keycloak": {
+      "login_theme": "fold-fence-demo",
+      "account_theme": "fold-fence-demo"
+    },
+    "element_web": {
+      "brand": "Organization Messenger",
+      "default_theme": "light",
+      "welcome_url": ""
+    }
+  }
+}

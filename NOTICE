@@ -1,0 +1,26 @@
+# Notices
+
+Matrix Keycloak Demo is maintained by **Foldfence Studios**. Existing
+copyright and attribution notices identify the respective contributors and
+upstream projects.
+
+Repository-authored files without a more specific notice use Apache License
+2.0. Component-specific license terms apply to third-party and derived work.
+Names and marks identify the respective components. Trademark permissions
+and commercial licenses follow their owners' terms.
+[Apache License 2.0](LICENSE) · [License map](LICENSES/README.md)
+
+Foldfence Studios provides this demo as is, without warranties or conditions
+of any kind, subject to applicable law and the terms of the applicable
+licenses. Operators assess suitability, security and support for their own
+production deployment. [Deployment boundaries](docs/guides/SECURITY.md)
+
+`src/element-policy/FoldfenceInviteDialog.test.tsx` preserves the upstream
+copyright notices for New Vector Ltd. and The Matrix.org Foundation C.I.C.
+Files in the Element contact-picker derivative that carry an
+`AGPL-3.0-only` SPDX identifier remain under that separate license.
+
+The LiveKit v1.13.11 runtime build retains the upstream `LICENSE` and `NOTICE`,
+including the LiveKit, Inc. attribution. Keep those files with the component
+when redistributing it. [Upstream notice](https://github.com/livekit/livekit/blob/v1.13.11/NOTICE) ·
+[Third-party runtime notices](THIRD-PARTY-RUNTIME-NOTICES.md)

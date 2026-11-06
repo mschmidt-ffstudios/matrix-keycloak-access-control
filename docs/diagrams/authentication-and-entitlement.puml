@@ -1,0 +1,45 @@
+@startuml
+title Matrix Login Entitlement — Example Flow
+skinparam shadowing false
+skinparam defaultTextAlignment center
+skinparam activity {
+  BackgroundColor #F8FAFC
+  BorderColor #334155
+  DiamondBackgroundColor #FFF7D6
+  DiamondBorderColor #A16207
+}
+
+start
+:Browser or Matrix client starts MAS upstream OIDC login;
+:MAS redirects to Keycloak;
+:Run the MAS client's dedicated Keycloak Browser flow;
+note right
+  The flow requires the existing Browser
+  Methods subflow, preserving cookie, IdP,
+  password and MFA behavior. It then runs
+  a direct conditional missing-role branch.
+  The v2 flow has no empty required wrapper.
+
+  Keycloak account can remain enabled when
+  the role is absent. Entitlement is checked
+  for Matrix authentication; it need not disable
+  unrelated Keycloak applications.
+
+  Verify flow binding, role mapping, and denial
+  behavior in each deployment.
+end note
+:Complete existing browser methods (SSO cookie, IdP, password, MFA as configured);
+if (Effective matrix-access realm role absent?) then (yes)
+  :Conditional missing-role subflow runs;
+  :Deny Access authenticator rejects;
+  :No OIDC success response;
+  stop
+else (no)
+  :Conditional subflow is skipped;
+  :Continue OIDC response to MAS;
+  :MAS completes Matrix authentication;
+  :Issue Matrix session;
+  stop
+endif
+
+@enduml

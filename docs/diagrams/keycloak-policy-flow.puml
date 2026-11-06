@@ -1,0 +1,31 @@
+@startuml
+title From Keycloak grants to Matrix actions
+skinparam shadowing false
+skinparam backgroundColor #FEFEFD
+skinparam defaultTextAlignment center
+skinparam defaultFontSize 15
+skinparam nodesep 26
+skinparam ranksep 32
+skinparam ArrowColor #475569
+skinparam rectangle {
+  BorderColor #334155
+  BackgroundColor #F8FAFC
+  FontColor #0F172A
+  RoundCorner 12
+}
+
+rectangle "**Keycloak**\nRealm roles · matrix-synapse client roles\nsecurity_clearance · 1to1chat.* groups" as Keycloak #E0ECFF
+rectangle "**Matrix Authentication Service**\nIssues the Matrix session" as MAS
+rectangle "**Policy Sync**\nMatches grants to the room policy\nPublishes a short-lived snapshot" as Sync #E0F2FE
+rectangle "**Synapse with policy module**\nEnforces room and 1:1 chat rules\nChecks current room state" as Synapse #DDF4EA
+rectangle "**Export Service**\nChecks matrix-access, org-export-admin\nand current room scope" as Export
+rectangle "**OrgBot**\nRead-only E2EE room participant\nBuilds a scoped ZIP from available content" as Bot #FFF1D8
+
+Keycloak -down-> MAS : OIDC after matrix-access check
+Keycloak -down-> Sync : effective grants
+Sync -down-> Synapse : membership, power and snapshot
+Synapse -up-> MAS : token introspection
+Sync -down-> Export : room map and snapshot
+Synapse -down-> Bot : encrypted room sync
+Export <-down-> Bot : selected rooms / ZIP
+@enduml

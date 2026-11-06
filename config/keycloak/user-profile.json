@@ -1,0 +1,24 @@
+{
+  "attribute": {
+    "name": "security_clearance",
+    "displayName": "Security clearance",
+    "multivalued": false,
+    "permissions": {
+      "view": ["admin"],
+      "edit": ["admin"]
+    },
+    "validations": {
+      "options": {
+        "options": [
+          "basis",
+          "intern",
+          "vertraulich",
+          "streng_vertraulich"
+        ]
+      }
+    },
+    "annotations": {
+      "inputType": "select"
+    }
+  }
+}

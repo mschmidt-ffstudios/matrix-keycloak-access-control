@@ -1,0 +1,63 @@
+@startuml
+title MatrixRTC Call Token Authorization
+autonumber
+skinparam shadowing false
+skinparam sequenceMessageAlign center
+
+actor "Element client" as Client
+participant "Nginx edge" as Edge
+participant "Synapse call-policy guard" as Guard
+participant "Keycloak policy snapshot" as Policy
+participant "Synapse room state" as State
+participant "Synapse MatrixRTC proxy / appservice" as RTCProxy
+participant "Private LiveKit JWT service" as JWT
+participant "LiveKit SFU" as SFU
+
+alt Native Matrix Client-Server token request
+  Client -> Edge : POST MSC4195 get_token\nMatrix bearer + room/call data
+  Edge -> Guard : fixed internal guard route
+  Guard -> Guard : authenticate bearer; derive user from token
+  Guard -> Policy : load current room-policy grant
+  Guard -> State : check joined membership, Megolm and call power >= 10
+  Guard -> Guard : require current writer-level room authorization
+  Guard -> RTCProxy : POST fixed native get_token route\nforward original bearer + request
+  RTCProxy -> JWT : MatrixRTC application-service request
+  JWT -> State : validate room membership / Matrix token
+  JWT --> RTCProxy : candidate call JWT
+  RTCProxy --> Guard : candidate token response
+  Guard -> Policy : reload current policy
+  Guard -> State : recheck authorization after token mint
+  Guard -> Edge : return only validated JWT
+  Edge --> Client : Matrix token response
+else Element Call SFU token request
+  Client -> Edge : POST /livekit/jwt/sfu/get\nOpenID proof + room/call data
+  Edge -> Guard : fixed internal guard route
+  Guard -> State : validate OpenID proof using local userinfo
+  Guard -> Policy : load current room-policy grant
+  Guard -> State : check joined membership, Megolm and call power >= 10
+  Guard -> JWT : fixed private /sfu/get request
+  JWT -> State : validate Matrix OpenID / room membership
+  JWT --> Guard : candidate URL + JWT
+  Guard -> Policy : reload current policy
+  Guard -> State : recheck room state and call permission
+  Guard --> Edge : return candidate only if still authorized
+  Edge --> Client : authorized URL + call token
+end
+
+Client -> SFU : HTTPS/WSS signaling with call token
+Client -> SFU : media transport (network dependent)
+
+note over Edge,JWT
+  Other public JWT mint routes are denied. The federation
+  get_token route is not exposed in this single-homeserver demo.
+  Synapse's standalone OpenID userinfo route is narrowly exposed
+  for proof validation; the general federation API is not enabled.
+end note
+
+note bottom
+  This diagram describes token authorization and signaling.
+  It does not establish successful media transport, client
+  compatibility, or ringing. Test audio/video, NAT, firewall,
+  and TURN behavior for the selected clients and deployment.
+end note
+@enduml

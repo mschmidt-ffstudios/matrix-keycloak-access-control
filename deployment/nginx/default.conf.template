@@ -1,0 +1,272 @@
+limit_req_zone $binary_remote_addr zone=demo_auth:10m rate=10r/s;
+log_format demo_safe '$remote_addr $request_method $uri $server_protocol $status $body_bytes_sent';
+
+upstream mas_backend {
+    zone mas_backend 64k;
+    resolver 127.0.0.11 valid=10s ipv6=off;
+    server mas:8080 resolve;
+}
+
+map $http_upgrade $connection_upgrade {
+    default upgrade;
+    '' close;
+}
+
+server {
+    listen 80;
+    server_name %%DEMO_HOSTNAME%%;
+    access_log /var/log/nginx/access.log demo_safe;
+    return 308 https://$host:%%DEMO_HTTPS_PORT%%$request_uri;
+}
+
+server {
+    listen 443 ssl;%%CANONICAL_TLS_LISTENER%%
+    http2 on;
+    server_name %%DEMO_HOSTNAME%%;
+    access_log /var/log/nginx/access.log demo_safe;
+
+%%TRUSTED_PROXY_RULES%%
+    ssl_certificate /etc/nginx/certs/fullchain.pem;
+    ssl_certificate_key /etc/nginx/certs/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    client_max_body_size 50m;
+    limit_req_status 429;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Referrer-Policy "no-referrer" always;
+    add_header Strict-Transport-Security "max-age=31536000" always;
+
+    location = /.well-known/matrix/client {
+        default_type application/json;
+        add_header Access-Control-Allow-Origin "*" always;
+        return 200 '{"m.homeserver":{"base_url":"%%MATRIX_PUBLIC_URL%%"},"org.matrix.msc4143.rtc_foci":[{"type":"livekit","livekit_service_url":"%%LIVEKIT_JWT_PUBLIC_URL%%"}]}';
+    }
+
+    location = /.well-known/matrix/server {
+        default_type application/json;
+        add_header Access-Control-Allow-Origin "*" always;
+        return 200 '{"m.server":"%%MATRIX_PUBLIC_AUTHORITY%%"}';
+    }
+
+    # MatrixRTC's native Client-Server token endpoint is also policy-gated.
+    # The guard authenticates the Matrix bearer and checks room role, joined
+    # membership, encryption and current policy before proxying internally.
+    location = /_matrix/client/unstable/io.element.msc4195/rtc/livekit/get_token {
+        client_max_body_size 16k;
+        if ($request_method != POST) { return 405; }
+        proxy_pass http://synapse:8008/_synapse/client/foldfence/call/get-token;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 20s;
+    }
+
+    # Server-Server token minting is outside this single-homeserver demo.
+    location = /_matrix/federation/unstable/io.element.msc4195/rtc/livekit/get_token {
+        return 404;
+    }
+
+    location ^~ /mas/ {
+        proxy_pass http://mas_backend/;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_read_timeout 300s;
+    }
+
+    location ^~ /_synapse/admin/ {
+        return 404;
+    }
+
+    location ^~ /_synapse/mas {
+        proxy_pass http://synapse:8008;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 600s;
+    }
+
+    location ~ ^/_matrix/client/(.*)/(login|logout|refresh)$ {
+        proxy_pass http://mas_backend;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 300s;
+    }
+
+    # lk-jwt-service verifies Matrix OpenID tokens at this endpoint. Synapse
+    # exposes only its standalone `openid` resource, not the broader federation
+    # API. Restrict this route to its protocol's exact GET endpoint.
+    location = /_matrix/federation/v1/openid/userinfo {
+        limit_except GET { deny all; }
+        proxy_pass http://synapse:8008;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 10s;
+    }
+
+    location /_matrix/ {
+        proxy_pass http://synapse:8008;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 600s;
+        client_max_body_size 50m;
+    }
+
+    location ^~ /_synapse/client {
+        proxy_pass http://synapse:8008;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 600s;
+    }
+
+    # A public, realm-specific console is available to delegated demo admins.
+    # Keycloak still authenticates and authorizes every Admin REST request.
+    location = /demo-admin {
+        return 308 /auth/admin/foldfence-demo/console/;
+    }
+
+    # Master-realm sign-in and every admin route except the demo console,
+    # demo realm API and authenticated server-info endpoint stay private.
+    location ~ ^/auth/(?:realms/master(?:/|$)|admin(?:$|/(?!foldfence-demo/console(?:/|$)|realms/foldfence-demo(?:/|$)|serverinfo(?:/|$)))) {
+%%ADMIN_ACCESS_RULES%%
+        limit_req zone=demo_auth burst=40 nodelay;
+        proxy_pass http://keycloak:8080;
+        proxy_http_version 1.1;
+        # Tracing is disabled; never pass untrusted tracestate to OTel extraction.
+        proxy_set_header tracestate "";
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Forwarded-Host $host:%%DEMO_HTTPS_PORT%%;
+        proxy_set_header X-Forwarded-Port %%DEMO_HTTPS_PORT%%;
+        proxy_read_timeout 300s;
+    }
+
+    location ~ ^/auth/(?:admin(?:/|$)|realms/[^/]+/(?:login-actions(?:/|$)|protocol/openid-connect/token(?:/|$))) {
+        limit_req zone=demo_auth burst=40 nodelay;
+        proxy_pass http://keycloak:8080;
+        proxy_http_version 1.1;
+        # Repeat in every location: proxy_set_header inheritance is not additive.
+        proxy_set_header tracestate "";
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Forwarded-Host $host:%%DEMO_HTTPS_PORT%%;
+        proxy_set_header X-Forwarded-Port %%DEMO_HTTPS_PORT%%;
+        proxy_read_timeout 300s;
+    }
+
+    location /auth/ {
+        proxy_pass http://keycloak:8080/auth/;
+        proxy_http_version 1.1;
+        proxy_set_header tracestate "";
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Forwarded-Host $host:%%DEMO_HTTPS_PORT%%;
+        proxy_set_header X-Forwarded-Port %%DEMO_HTTPS_PORT%%;
+        proxy_read_timeout 300s;
+    }
+
+    # Browser/native MatrixRTC clients keep the standard path. Synapse checks
+    # the OpenID proof, current room grant, membership, E2EE and call power
+    # level before forwarding to the private token service.
+    location = /livekit/jwt/sfu/get {
+        client_max_body_size 16k;
+        if ($request_method = OPTIONS) {
+            add_header Access-Control-Allow-Origin "*" always;
+            add_header Access-Control-Allow-Methods "POST, OPTIONS" always;
+            add_header Access-Control-Allow-Headers "Content-Type, Authorization" always;
+            add_header Access-Control-Max-Age 600 always;
+            return 204;
+        }
+        if ($request_method != POST) { return 405; }
+        proxy_pass http://synapse:8008/_synapse/client/foldfence/call/sfu/get;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 20s;
+    }
+
+    # Health is read-only. Do not expose the service's other token-mint routes.
+    location = /livekit/jwt/healthz {
+        limit_except GET { deny all; }
+        proxy_pass http://lk-jwt-service:8080/healthz;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 5s;
+    }
+
+    location ^~ /livekit/jwt/ {
+        return 404;
+    }
+
+    location ^~ /livekit/sfu/ {
+        proxy_pass http://livekit:7880/;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection $connection_upgrade;
+        proxy_buffering off;
+        proxy_read_timeout 120s;
+    }
+
+    location ^~ /_export/ {
+        # Resolve the optional export service on demand so sign-in can start
+        # before policy reconciliation and export readiness have completed.
+        resolver 127.0.0.11 valid=10s ipv6=off;
+        set $export_upstream export-service:8090;
+        rewrite ^/_export/(.*)$ /$1 break;
+        proxy_pass http://$export_upstream;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_read_timeout 120s;
+    }
+
+    location = /export {
+        return 308 /export/;
+    }
+
+    location ^~ /export/ {
+        root /usr/share/nginx/html;
+        try_files $uri $uri/ /export/index.html;
+        add_header Cache-Control "no-store" always;
+        add_header Referrer-Policy "no-referrer" always;
+        add_header X-Content-Type-Options "nosniff" always;
+    }
+
+    location / {
+        proxy_pass http://element-web:80;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-For $remote_addr;
+    }
+}
+
+%%AUTH_HOST_BLOCKS%%

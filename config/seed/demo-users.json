@@ -1,0 +1,366 @@
+{
+  "schema_version": 1,
+  "status": "draft",
+  "credential_source": "local environment; no passwords are stored in this file",
+  "clearance_levels": [
+    {
+      "id": "basis",
+      "rank": 0
+    },
+    {
+      "id": "intern",
+      "rank": 1
+    },
+    {
+      "id": "vertraulich",
+      "rank": 2
+    },
+    {
+      "id": "streng_vertraulich",
+      "rank": 3
+    }
+  ],
+  "users": [
+    {
+      "username": "demo-01",
+      "display_name": "Demo User 01",
+      "clearance": "basis",
+      "room_roles": [
+        "room.allgemein.reader",
+        "room.abteilung_x.writer"
+      ],
+      "groups": [
+        "/orga.demo",
+        "/1to1chat.orga-a.abteilung-x"
+      ]
+    },
+    {
+      "username": "demo-02",
+      "display_name": "Demo User 02",
+      "clearance": "basis",
+      "room_roles": [
+        "room.allgemein.writer",
+        "room.abteilung_x.writer"
+      ],
+      "groups": [
+        "/orga.demo",
+        "/1to1chat.orga-a.abteilung-x"
+      ]
+    },
+    {
+      "username": "demo-03",
+      "display_name": "Demo User 03",
+      "clearance": "basis",
+      "room_roles": [
+        "room.allgemein.writer",
+        "room.abteilung_x.writer"
+      ],
+      "groups": [
+        "/orga.demo",
+        "/1to1chat.orga-a.abteilung-x"
+      ]
+    },
+    {
+      "username": "demo-04",
+      "display_name": "Demo User 04",
+      "clearance": "basis",
+      "room_roles": [
+        "room.allgemein.writer",
+        "room.abteilung_x.writer"
+      ],
+      "groups": [
+        "/orga.demo",
+        "/1to1chat.orga-a.abteilung-x"
+      ]
+    },
+    {
+      "username": "demo-05",
+      "display_name": "Demo User 05",
+      "clearance": "basis",
+      "room_roles": [
+        "room.allgemein.moderator",
+        "room.abteilung_x.moderator"
+      ],
+      "groups": [
+        "/orga.demo",
+        "/1to1chat.orga-a.abteilung-x"
+      ]
+    },
+    {
+      "username": "demo-06",
+      "display_name": "Demo User 06",
+      "clearance": "intern",
+      "room_roles": [
+        "room.allgemein.writer",
+        "room.pummel.reader",
+        "room.abteilung_y.reader"
+      ],
+      "groups": [
+        "/orga.demo",
+        "/1to1chat.orga-b.abteilung-y"
+      ]
+    },
+    {
+      "username": "demo-07",
+      "display_name": "Demo User 07",
+      "clearance": "intern",
+      "room_roles": [
+        "room.allgemein.writer",
+        "room.pummel.writer",
+        "room.abteilung_y.writer"
+      ],
+      "groups": [
+        "/orga.demo",
+        "/1to1chat.orga-b.abteilung-y"
+      ]
+    },
+    {
+      "username": "demo-08",
+      "display_name": "Demo User 08",
+      "clearance": "intern",
+      "room_roles": [
+        "room.allgemein.writer",
+        "room.pummel.writer",
+        "room.abteilung_y.writer"
+      ],
+      "groups": [
+        "/orga.demo",
+        "/1to1chat.orga-b.abteilung-y"
+      ]
+    },
+    {
+      "username": "demo-09",
+      "display_name": "Demo User 09",
+      "clearance": "intern",
+      "room_roles": [
+        "room.allgemein.writer",
+        "room.pummel.moderator",
+        "room.abteilung_y.moderator"
+      ],
+      "groups": [
+        "/orga.demo",
+        "/1to1chat.orga-b.abteilung-y"
+      ]
+    },
+    {
+      "username": "demo-10",
+      "display_name": "Demo User 10",
+      "clearance": "intern",
+      "room_roles": [
+        "room.allgemein.writer",
+        "room.pummel.reader",
+        "room.abteilung_y.reader"
+      ],
+      "groups": [
+        "/orga.demo",
+        "/1to1chat.orga-b.abteilung-y"
+      ]
+    },
+    {
+      "username": "demo-11",
+      "display_name": "Demo User 11",
+      "clearance": "vertraulich",
+      "room_roles": [
+        "room.allgemein.writer",
+        "room.pummel.writer",
+        "room.speicher.reader",
+        "room.abteilung_x.reader"
+      ],
+      "groups": [
+        "/orga.demo",
+        "/1to1chat.orga-a.abteilung-x",
+        "/1to1chat.orga.leitung"
+      ]
+    },
+    {
+      "username": "demo-12",
+      "display_name": "Demo User 12",
+      "clearance": "vertraulich",
+      "room_roles": [
+        "room.allgemein.writer",
+        "room.pummel.writer",
+        "room.speicher.writer",
+        "room.abteilung_x.writer"
+      ],
+      "groups": [
+        "/orga.demo",
+        "/1to1chat.orga-a.abteilung-x",
+        "/1to1chat.orga.leitung"
+      ]
+    },
+    {
+      "username": "demo-13",
+      "display_name": "Demo User 13",
+      "clearance": "vertraulich",
+      "room_roles": [
+        "room.allgemein.writer",
+        "room.pummel.writer",
+        "room.speicher.writer",
+        "room.abteilung_x.writer"
+      ],
+      "groups": [
+        "/orga.demo",
+        "/1to1chat.orga-a.abteilung-x",
+        "/1to1chat.orga.leitung"
+      ]
+    },
+    {
+      "username": "demo-14",
+      "display_name": "Demo User 14",
+      "clearance": "vertraulich",
+      "room_roles": [
+        "room.allgemein.writer",
+        "room.pummel.moderator",
+        "room.speicher.moderator",
+        "room.abteilung_x.moderator"
+      ],
+      "groups": [
+        "/orga.demo",
+        "/1to1chat.orga-a.abteilung-x",
+        "/1to1chat.orga.leitung"
+      ]
+    },
+    {
+      "username": "demo-15",
+      "display_name": "Demo User 15",
+      "clearance": "vertraulich",
+      "room_roles": [
+        "room.allgemein.writer",
+        "room.pummel.reader",
+        "room.speicher.reader",
+        "room.abteilung_x.reader"
+      ],
+      "groups": [
+        "/orga.demo",
+        "/1to1chat.orga-a.abteilung-x",
+        "/1to1chat.orga.leitung"
+      ]
+    },
+    {
+      "username": "demo-16",
+      "display_name": "Demo User 16",
+      "clearance": "streng_vertraulich",
+      "room_roles": [
+        "room.allgemein.writer",
+        "room.pummel.writer",
+        "room.speicher.writer",
+        "room.leitung.reader",
+        "room.abteilung_y.reader"
+      ],
+      "groups": [
+        "/orga.demo",
+        "/1to1chat.orga-b.abteilung-y",
+        "/1to1chat.orga.leitung"
+      ]
+    },
+    {
+      "username": "demo-17",
+      "display_name": "Demo User 17",
+      "clearance": "streng_vertraulich",
+      "room_roles": [
+        "room.allgemein.writer",
+        "room.pummel.writer",
+        "room.speicher.writer",
+        "room.leitung.writer",
+        "room.abteilung_y.writer"
+      ],
+      "groups": [
+        "/orga.demo",
+        "/1to1chat.orga-b.abteilung-y",
+        "/1to1chat.orga.leitung"
+      ]
+    },
+    {
+      "username": "demo-18",
+      "display_name": "Demo User 18",
+      "clearance": "streng_vertraulich",
+      "room_roles": [
+        "room.allgemein.writer",
+        "room.pummel.moderator",
+        "room.speicher.writer",
+        "room.leitung.writer",
+        "room.abteilung_y.moderator"
+      ],
+      "groups": [
+        "/orga.demo",
+        "/1to1chat.orga-b.abteilung-y",
+        "/1to1chat.orga.leitung"
+      ]
+    },
+    {
+      "username": "demo-19",
+      "display_name": "Demo User 19",
+      "clearance": "streng_vertraulich",
+      "room_roles": [
+        "room.allgemein.writer",
+        "room.pummel.writer",
+        "room.speicher.moderator",
+        "room.leitung.moderator",
+        "room.abteilung_y.writer"
+      ],
+      "groups": [
+        "/orga.demo",
+        "/1to1chat.orga-b.abteilung-y",
+        "/1to1chat.orga.leitung"
+      ]
+    },
+    {
+      "username": "demo-20",
+      "display_name": "Demo User 20",
+      "clearance": "streng_vertraulich",
+      "room_roles": [
+        "room.allgemein.moderator",
+        "room.pummel.moderator",
+        "room.speicher.moderator",
+        "room.leitung.moderator",
+        "room.abteilung_y.moderator"
+      ],
+      "realm_roles": [
+        "org-export-admin"
+      ],
+      "groups": [
+        "/orga.demo",
+        "/1to1chat.orga-b.abteilung-y",
+        "/1to1chat.orga.leitung"
+      ]
+    },
+    {
+      "username": "export-test-01",
+      "display_name": "Export Test User 01",
+      "clearance": "basis",
+      "room_roles": [
+        "room.export_test_allgemein.writer",
+        "room.export_test_pummel.writer",
+        "room.export_test_speicher.writer",
+        "room.export_test_leitung.writer"
+      ],
+      "account_type": "export_test_only"
+    },
+    {
+      "username": "export-test-02",
+      "display_name": "Export Test User 02",
+      "clearance": "basis",
+      "room_roles": [
+        "room.export_test_allgemein.writer",
+        "room.export_test_pummel.writer",
+        "room.export_test_speicher.writer",
+        "room.export_test_leitung.writer"
+      ],
+      "account_type": "export_test_only"
+    }
+  ],
+  "keycloak_groups": [
+    {
+      "name": "orga.demo"
+    },
+    {
+      "name": "1to1chat.orga-a.abteilung-x"
+    },
+    {
+      "name": "1to1chat.orga-b.abteilung-y"
+    },
+    {
+      "name": "1to1chat.orga.leitung"
+    }
+  ]
+}

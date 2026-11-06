@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="720" height="160" viewBox="0 0 720 160" role="img" aria-labelledby="title">
+  <title id="title">Organization Messenger</title>
+  <rect x="8" y="8" width="144" height="144" rx="40" fill="#146B8C"/>
+  <path d="M42 52h76v52H82l-21 18v-18H42z" fill="#fff"/>
+  <circle cx="65" cy="78" r="5" fill="#146B8C"/><circle cx="80" cy="78" r="5" fill="#146B8C"/><circle cx="95" cy="78" r="5" fill="#146B8C"/>
+  <text x="184" y="103" fill="#0B2034" font-family="Arial, sans-serif" font-size="50" font-weight="700">Organization Messenger</text>
+</svg>

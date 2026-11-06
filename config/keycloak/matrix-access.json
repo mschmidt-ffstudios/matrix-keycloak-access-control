@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "role": {
+    "name": "matrix-access",
+    "description": "May authenticate through Matrix Authentication Service"
+  },
+  "client_id": "matrix-authentication-service",
+  "browser_flow": {
+    "alias": "Matrix Access Browser v2",
+    "description": "Require the Matrix access entitlement after browser authentication, including an existing Keycloak SSO cookie.",
+    "methods_source_alias": "browser",
+    "methods_alias": "Matrix Access Browser Methods v2",
+    "missing_role_alias": "Matrix Access Missing Role v2",
+    "condition_config_alias": "Matrix Access Missing Role Condition v2",
+    "condition_authenticator": "conditional-user-role",
+    "deny_authenticator": "deny-access-authenticator",
+    "condition_role_key": "condUserRole",
+    "condition_negate_key": "negate"
+  },
+  "migration": {
+    "additional_existing_usernames": [],
+    "flag": "--grant-matrix-access-existing-demo-users"
+  }
+}

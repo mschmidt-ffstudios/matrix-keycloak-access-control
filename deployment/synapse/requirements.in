@@ -1,0 +1,9 @@
+# Same Synapse release with the features used by this Matrix/MAS/Keycloak demo.
+# SAML/xmlsec/LDAP and tracing daemons are not configured by this deployment.
+matrix-synapse[postgres,oidc,url-preview,redis,sentry,cache-memory]==1.164.2
+Authlib==1.9.3
+Twisted==26.10.0
+msgpack==1.2.4
+pyasn1==0.6.5
+urllib3==2.8.0
+setuptools==84.2.1

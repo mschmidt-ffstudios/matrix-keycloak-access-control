@@ -1,0 +1,54 @@
+@startuml
+title Matrix + Keycloak Demo — Logical Stack
+left to right direction
+skinparam shadowing false
+skinparam componentStyle rectangle
+skinparam packageStyle rectangle
+skinparam defaultTextAlignment center
+skinparam nodesep 24
+skinparam ranksep 30
+
+actor "Users\nweb / native client / export admin" as Users
+rectangle "Nginx reverse proxy\nElement Web + public HTTPS/WSS routes" as Edge
+
+package "Routed through Nginx" {
+  rectangle "Keycloak + MAS\nidentity endpoints" as Identity
+  rectangle "Synapse\nMatrix API; admin API private" as Synapse
+  rectangle "Export Service\nauthenticated scoped ZIP API" as Export
+}
+
+package "Private service network" {
+  rectangle "Provisioner\nidentity + session issuer" as Provisioner
+  rectangle "Policy Sync\nreads grants; manages rooms" as PolicySync
+  rectangle "OrgBot\nPL 0 E2EE client" as OrgBot
+}
+
+Users --> Edge
+Edge --> Identity : sign-in
+Edge --> Synapse : Matrix API
+Edge --> Export : authenticated export API
+Provisioner --> Identity : private account / session setup
+Identity --> PolicySync : roles / groups
+PolicySync --> Synapse : room policy
+Synapse <--> OrgBot : E2EE events + keys
+Export --> OrgBot : exact authorized room scope
+
+note right of Provisioner
+  Admin-token volume: Provisioner writes;
+  Policy Sync reads read-only. OrgBot has no
+  mount of this volume.
+end note
+
+note right of OrgBot
+  Separate session volume: Provisioner writes;
+  OrgBot mounts read-only. Crypto store is private.
+  Synapse relays E2EE events and keys; it does not
+  decrypt room content. Export receives only the
+  Bot's observed/decrypted ZIP, which may be partial.
+end note
+
+note bottom
+  Optional MatrixRTC authorization and signaling
+  are shown separately in matrixrtc-call.puml.
+end note
+@enduml

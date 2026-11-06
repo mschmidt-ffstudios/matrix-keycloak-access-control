@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="referrer" content="no-referrer">
+    <title>Organization export</title>
+    <style>
+      :root { color-scheme: light dark; font-family: system-ui, sans-serif; }
+      body { max-width: 54rem; margin: 3rem auto; padding: 0 1rem; line-height: 1.5; }
+      h1 { margin-bottom: .25rem; }
+      .muted { opacity: .75; }
+      .toolbar, .actions { display: flex; flex-wrap: wrap; gap: .75rem; margin: 1rem 0; }
+      button { padding: .65rem 1rem; border-radius: .4rem; cursor: pointer; }
+      button:disabled { cursor: not-allowed; opacity: .55; }
+      fieldset { border: 1px solid #8888; border-radius: .5rem; margin: 1rem 0; padding: .5rem 1rem; }
+      label.room { display: flex; gap: .7rem; align-items: flex-start; padding: .45rem 0; }
+      label.room small { display: block; opacity: .75; }
+      #status { min-height: 1.5rem; padding: .75rem; border-radius: .4rem; background: #8882; }
+      .warning { border-left: .3rem solid #d89b00; padding: .5rem .75rem; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Organization export</h1>
+      <p class="muted">Sign in through Keycloak to download an export of managed rooms.</p>
+      <p class="warning">A partial export can omit earlier messages or files. Check the downloaded archive status before relying on it.</p>
+      <div class="toolbar">
+        <button id="sign-in" type="button">Sign in with Keycloak</button>
+        <button id="sign-out" type="button" hidden>Sign out</button>
+      </div>
+      <section id="room-section" hidden>
+        <fieldset>
+          <legend>Room scope</legend>
+          <label><input type="radio" name="scope" value="selected" checked> Selected rooms</label>
+          <label><input type="radio" name="scope" value="all"> All managed rooms</label>
+        </fieldset>
+        <fieldset id="rooms" aria-label="Managed rooms">
+          <legend>Choose rooms</legend>
+          <p class="muted">Room access is checked again by the export service.</p>
+        </fieldset>
+        <div class="actions">
+          <button id="export" type="button" disabled>Export selected rooms</button>
+        </div>
+      </section>
+      <p id="status" role="status" aria-live="polite">Sign in to view the managed room list.</p>
+    </main>
+    <script>
+      "use strict";
+      const realm = "foldfence-demo";
+      const clientId = "matrix-export-client";
+      const issuerBase = `${location.origin}/auth`;
+      const apiBase = `${location.origin}/_export`;
+      const redirectUri = new URL("./", location.href).href;
+      let accessToken = null;
+      let rooms = [];
+
+      const statusNode = document.querySelector("#status");
+      const roomSection = document.querySelector("#room-section");
+      const roomList = document.querySelector("#rooms");
+      const exportButton = document.querySelector("#export");
+      const signInButton = document.querySelector("#sign-in");
+      const signOutButton = document.querySelector("#sign-out");
+
+      function status(message) { statusNode.textContent = message; }
+      function base64Url(bytes) {
+        let binary = "";
+        for (const byte of bytes) binary += String.fromCharCode(byte);
+        return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+      }
+      function randomVerifier() { return base64Url(crypto.getRandomValues(new Uint8Array(32))); }
+      async function challengeFor(verifier) {
+        const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier));
+        return base64Url(new Uint8Array(digest));
+      }
+      function apiUrl(path) { return `${apiBase}${path}`; }
+
+      async function signIn() {
+        const verifier = randomVerifier();
+        const state = randomVerifier();
+        sessionStorage.setItem("export.pkce.verifier", verifier);
+        sessionStorage.setItem("export.pkce.state", state);
+        const challenge = await challengeFor(verifier);
+        const authorize = new URL(`${issuerBase}/realms/${realm}/protocol/openid-connect/auth`);
+        authorize.search = new URLSearchParams({
+          client_id: clientId,
+          redirect_uri: redirectUri,
+          response_type: "code",
+          scope: "openid",
+          state,
+          code_challenge: challenge,
+          code_challenge_method: "S256",
+        });
+        location.assign(authorize);
+      }
+
+      async function exchangeCode() {
+        const query = new URLSearchParams(location.search);
+        const code = query.get("code");
+        if (!code) return false;
+        const expectedState = sessionStorage.getItem("export.pkce.state");
+        const state = query.get("state");
+        const verifier = sessionStorage.getItem("export.pkce.verifier");
+        sessionStorage.removeItem("export.pkce.state");
+        sessionStorage.removeItem("export.pkce.verifier");
+        history.replaceState({}, document.title, redirectUri);
+        if (!expectedState || !state || state !== expectedState || !verifier) {
+          throw new Error("Sign-in could not be verified. Start again.");
+        }
+        const response = await fetch(`${issuerBase}/realms/${realm}/protocol/openid-connect/token`, {
+          method: "POST",
+          headers: { "content-type": "application/x-www-form-urlencoded" },
+          body: new URLSearchParams({
+            grant_type: "authorization_code",
+            client_id: clientId,
+            redirect_uri: redirectUri,
+            code,
+            code_verifier: verifier,
+          }),
+          cache: "no-store",
+        });
+        if (!response.ok) throw new Error("Keycloak sign-in failed. Start again.");
+        const token = await response.json();
+        if (typeof token.access_token !== "string") throw new Error("Keycloak did not return an access token.");
+        accessToken = token.access_token;
+        return true;
+      }
+
+      async function api(path, options = {}) {
+        const response = await fetch(apiUrl(path), {
+          ...options,
+          headers: {
+            ...(options.body ? { "content-type": "application/json" } : {}),
+            authorization: `Bearer ${accessToken}`,
+            ...(options.headers || {}),
+          },
+          cache: "no-store",
+        });
+        if (!response.ok) {
+          if (response.status === 401) accessToken = null;
+          throw new Error(response.status === 403 ? "This account is not allowed to export rooms." : `Request failed (${response.status}).`);
+        }
+        return response;
+      }
+
+      function renderRooms() {
+        roomList.querySelectorAll("label.room, p.room-empty").forEach((node) => node.remove());
+        for (const room of rooms) {
+          const label = document.createElement("label");
+          label.className = "room";
+          const input = document.createElement("input");
+          input.type = "checkbox";
+          input.value = room.room_id;
+          input.checked = !room.test_only;
+          input.addEventListener("change", updateExportButton);
+          const text = document.createElement("span");
+          text.textContent = room.name;
+          const detail = document.createElement("small");
+          detail.textContent = `${room.classification}${room.test_only ? " · synthetic export test" : ""}`;
+          text.append(detail);
+          label.append(input, text);
+          roomList.append(label);
+        }
+        updateExportButton();
+      }
+
+      function selectedScope() {
+        return document.querySelector("input[name=scope]:checked")?.value || "selected";
+      }
+      function updateExportButton() {
+        const all = selectedScope() === "all";
+        exportButton.disabled = !accessToken || (!all && roomList.querySelectorAll("input[type=checkbox]:checked").length === 0);
+        exportButton.textContent = all ? "Export all managed rooms" : "Export selected rooms";
+      }
+
+      async function loadRooms() {
+        status("Loading authorized room list…");
+        try {
+          const response = await api("/v1/rooms");
+          const result = await response.json();
+          if (!Array.isArray(result.rooms)) throw new Error("The room list is invalid.");
+          rooms = result.rooms;
+          renderRooms();
+          roomSection.hidden = false;
+          signInButton.hidden = true;
+          signOutButton.hidden = false;
+          status("Choose one or more rooms, or export all managed rooms.");
+        } catch (error) {
+          roomSection.hidden = true;
+          status(error.message);
+        }
+      }
+
+      async function exportRooms() {
+        exportButton.disabled = true;
+        status("Preparing the export…");
+        const all = selectedScope() === "all";
+        const roomIds = [...roomList.querySelectorAll("input[type=checkbox]:checked")].map((input) => input.value);
+        try {
+          const response = await api("/v1/exports", {
+            method: "POST",
+            body: JSON.stringify(all ? { scope: "all" } : { scope: "selected", room_ids: roomIds }),
+          });
+          const completeness = response.headers.get("X-Export-Completeness") || "unknown";
+          const blob = await response.blob();
+          const href = URL.createObjectURL(blob);
+          const anchor = document.createElement("a");
+          anchor.href = href;
+          anchor.download = `matrix-export-${new Date().toISOString().replaceAll(":", "-")}.zip`;
+          document.body.append(anchor);
+          anchor.click();
+          anchor.remove();
+          URL.revokeObjectURL(href);
+          status(completeness === "complete"
+            ? "Export downloaded. Verify its manifest and scope before use."
+            : `Export downloaded with status “${completeness}”. It may omit earlier messages, keys, or files; inspect the manifest.`);
+        } catch (error) {
+          status(error.message);
+        } finally {
+          updateExportButton();
+        }
+      }
+
+      signInButton.addEventListener("click", () => signIn().catch((error) => status(error.message)));
+      signOutButton.addEventListener("click", () => {
+        accessToken = null;
+        rooms = [];
+        roomSection.hidden = true;
+        signInButton.hidden = false;
+        signOutButton.hidden = true;
+        status("Signed out of this export page. The Keycloak browser session may remain active.");
+      });
+      exportButton.addEventListener("click", () => exportRooms());
+      document.querySelectorAll("input[name=scope]").forEach((input) => input.addEventListener("change", updateExportButton));
+
+      exchangeCode()
+        .then((signedIn) => signedIn ? loadRooms() : null)
+        .catch((error) => status(error.message));
+    </script>
+  </body>
+</html>

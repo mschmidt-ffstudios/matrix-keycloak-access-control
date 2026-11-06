@@ -1,0 +1,501 @@
+x-postgres-demo-image: &postgres-demo-image
+  image: ${COMPOSE_PROJECT_NAME:-matrix-keycloak-demo}/postgres:17-alpine-security1
+  build:
+    context: ../..
+    dockerfile: deployment/postgres/Dockerfile
+
+services:
+  keycloak-db:
+    networks: [keycloak-data-net]
+    <<: *postgres-demo-image
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: keycloak
+      POSTGRES_USER: keycloak
+      POSTGRES_PASSWORD: ${KEYCLOAK_DB_PASSWORD:?Run scripts/prepare-demo.py first}
+    volumes:
+      - keycloak-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U keycloak -d keycloak"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  synapse-db:
+    networks: [synapse-data-net]
+    <<: *postgres-demo-image
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: synapse
+      POSTGRES_USER: synapse
+      POSTGRES_PASSWORD: ${SYNAPSE_DB_PASSWORD:?Run scripts/prepare-demo.py first}
+      POSTGRES_INITDB_ARGS: --locale=C --encoding=UTF8
+    volumes:
+      - synapse-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U synapse -d synapse"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  mas-db:
+    networks: [mas-data-net]
+    <<: *postgres-demo-image
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: mas
+      POSTGRES_USER: mas
+      POSTGRES_PASSWORD: ${MAS_DB_PASSWORD:?Run scripts/prepare-demo.py first}
+    volumes:
+      - mas-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mas -d mas"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  keycloak:
+    networks: [application, control, keycloak-data-net]
+    image: ${COMPOSE_PROJECT_NAME:-matrix-keycloak-demo}/keycloak:26.8.1-security2
+    platform: linux/amd64
+    build:
+      context: ../..
+      dockerfile: deployment/keycloak/Dockerfile
+      target: runtime
+    restart: unless-stopped
+    mem_limit: ${KEYCLOAK_MEMORY_LIMIT:-768m}
+    group_add: ["${DEMO_CONFIG_GID:-1000}"]
+    command: ["start", "--optimized", "--import-realm"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_BOOTSTRAP_ADMIN}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_BOOTSTRAP_PASSWORD}
+      KC_DB: postgres
+      KC_DB_URL_HOST: keycloak-db
+      KC_DB_URL_DATABASE: keycloak
+      KC_DB_USERNAME: keycloak
+      KC_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD}
+      KC_HTTP_ENABLED: "true"
+      KC_HTTP_RELATIVE_PATH: /auth
+      KC_PROXY_HEADERS: xforwarded
+      KC_HOSTNAME: ${KEYCLOAK_PUBLIC_URL}
+      KC_HEALTH_ENABLED: "true"
+      KC_METRICS_ENABLED: "false"
+      JAVA_OPTS_KC_HEAP: "-XX:MaxRAMPercentage=65 -XX:InitialRAMPercentage=30"
+      MATRIX_PUBLIC_URL: ${MATRIX_PUBLIC_URL}
+      KEYCLOAK_POLICY_CLIENT_SECRET: ${KEYCLOAK_POLICY_CLIENT_SECRET}
+    volumes:
+      - keycloak-data:/opt/keycloak/data
+      - ${DEMO_GENERATED_DIR:-../../internal/generated}/keycloak/import:/opt/keycloak/data/import:ro
+      - ${DEMO_GENERATED_DIR:-../../internal/generated}/keycloak/themes:/opt/keycloak/themes:ro
+    depends_on:
+      keycloak-db:
+        condition: service_healthy
+
+  synapse-config:
+    network_mode: none
+    image: ${COMPOSE_PROJECT_NAME:-matrix-keycloak-demo}/synapse:v1.164.2-security1
+    # The offline renderer sets ownership on the shared persistent volumes.
+    user: "0:0"
+    restart: "no"
+    entrypoint: ["/bin/sh", "-ec"]
+    command: ["if [ ! -s /data/signing.key ]; then /start.py generate; fi; python /config/render-homeserver.py"]
+    environment:
+      SYNAPSE_CONFIG_PATH: /data/homeserver.yaml
+      SYNAPSE_CONFIG_DIR: /data
+      SYNAPSE_DATA_DIR: /data
+      SYNAPSE_SERVER_NAME: ${MATRIX_SERVER_NAME}
+      SYNAPSE_REPORT_STATS: "no"
+      MATRIX_SERVER_NAME: ${MATRIX_SERVER_NAME}
+      MATRIX_SERVICE_USER_IDS: '@orgbot:${MATRIX_SERVER_NAME}'
+      MATRIX_PUBLIC_URL: ${MATRIX_PUBLIC_URL}
+      KEYCLOAK_PUBLIC_URL: ${KEYCLOAK_PUBLIC_URL}
+      KEYCLOAK_ISSUER_URL: ${KEYCLOAK_ISSUER_URL}
+      SYNAPSE_DB_PASSWORD: ${SYNAPSE_DB_PASSWORD}
+      SYNAPSE_MACAROON_SECRET: ${SYNAPSE_MACAROON_SECRET}
+      SYNAPSE_FORM_SECRET: ${SYNAPSE_FORM_SECRET}
+      SYNAPSE_CHAT_POLICY_SECRET: ${SYNAPSE_CHAT_POLICY_SECRET}
+      SYNAPSE_ADMIN_USER: ${SYNAPSE_ADMIN_USER:-demo-policy-admin}
+      ORG_BOT_USERNAME: ${ORG_BOT_USERNAME:-orgbot}
+      MAS_SYNAPSE_SHARED_SECRET: ${MAS_SYNAPSE_SHARED_SECRET}
+      LIVEKIT_PUBLIC_URL: ${LIVEKIT_PUBLIC_URL}
+      LIVEKIT_JWT_PUBLIC_URL: ${LIVEKIT_JWT_PUBLIC_URL}
+    volumes:
+      - synapse-data:/data
+      - ../../config/synapse/homeserver.yaml.template:/config/homeserver.yaml.template:ro
+      - ../../deployment/synapse/render-homeserver.py:/config/render-homeserver.py:ro
+      - chat-guard-data:/chat-guard
+    depends_on:
+      synapse-db:
+        condition: service_healthy
+
+  synapse:
+    networks: [application, control, synapse-data-net]
+    image: ${COMPOSE_PROJECT_NAME:-matrix-keycloak-demo}/synapse:v1.164.2-security1
+    build:
+      context: ../..
+      dockerfile: deployment/synapse/Dockerfile
+    restart: unless-stopped
+    user: "991:1000"
+    command: ["run", "--config-path=/data/homeserver.yaml"]
+    group_add: ["${DEMO_CONFIG_GID:-1000}"]
+    environment:
+      SYNAPSE_CONFIG_PATH: /data/homeserver.yaml
+      PYTHONPATH: /opt/foldfence-policy
+    volumes:
+      - synapse-data:/data
+      - ../../src/synapse-policy:/opt/foldfence-policy:ro
+      - policy-data:/policy:ro
+      - chat-guard-data:/chat-guard
+      - ${DEMO_GENERATED_DIR:-../../internal/generated}/livekit/livekit-registration.yaml:/config/livekit-registration.yaml:ro
+    depends_on:
+      synapse-config:
+        condition: service_completed_successfully
+      synapse-db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8008/_matrix/client/versions', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 18
+      start_period: 30s
+
+  mas:
+    networks: [application, control, mas-data-net]
+    image: ${COMPOSE_PROJECT_NAME:-matrix-keycloak-demo}/mas:1.28.0-security1
+    build:
+      context: ../..
+      dockerfile: deployment/mas/Dockerfile
+    restart: unless-stopped
+    group_add: ["${DEMO_CONFIG_GID:-65532}"]
+    command: ["server"]
+    environment:
+      MAS_CONFIG: /config/config-generated.yaml:/config/config.yaml
+      SSL_CERT_FILE: /config/mas-ca-bundle.pem
+    volumes:
+      - ${DEMO_GENERATED_DIR:-../../internal/generated}/mas:/config:ro
+    depends_on:
+      mas-db:
+        condition: service_healthy
+      synapse:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "mas-cli", "--config", "/config/config-generated.yaml", "--config", "/config/config.yaml", "doctor"]
+      interval: 20s
+      timeout: 15s
+      retries: 15
+      start_period: 45s
+
+  provisioner:
+    networks: [control, mas-data-net]
+    build:
+      context: ../..
+      dockerfile: src/provisioner/Dockerfile
+      additional_contexts:
+        mas_runtime: service:mas
+    restart: unless-stopped
+    group_add: ["${DEMO_CONFIG_GID:-65532}"]
+    environment:
+      NODE_OPTIONS: --no-experimental-sqlite
+      MATRIX_SERVER_NAME: ${MATRIX_SERVER_NAME}
+      MAS_UPSTREAM_PROVIDER_ID: ${MAS_UPSTREAM_PROVIDER_ID}
+      MAS_PROVISIONER_API_TOKEN: ${MAS_PROVISIONER_API_TOKEN}
+      MAS_ADMIN_USERNAME: ${SYNAPSE_ADMIN_USER:-demo-policy-admin}
+      MAS_ADMIN_TOKEN_DEVICE_ID: ${SYNAPSE_ADMIN_DEVICE_ID:-DEMOPOLICYSVC}
+      MAS_ADMIN_TOKEN_PATH: /run/mas-bootstrap/synapse-admin-token
+      MAS_ADMIN_TOKEN_VERIFIED_PATH: /run/mas-bootstrap/synapse-admin-token.verified
+      MAS_BOOTSTRAP_STATE_PATH: /run/mas-bootstrap/state.json
+      MAS_BOOTSTRAP_HTTP_PORT: "8091"
+      MAS_CONFIG: /config/config-generated.yaml:/config/config.yaml
+      MATRIX_HOMESERVER_URL: http://synapse:8008
+      KEYCLOAK_POLICY_CLIENT_SECRET: ${KEYCLOAK_POLICY_CLIENT_SECRET}
+      KEYCLOAK_PUBLIC_URL: http://keycloak:8080/auth
+      KEYCLOAK_REALM: foldfence-demo
+      KEYCLOAK_CLIENT_ID: matrix-policy-sync
+      ORG_BOT_USERNAME: ${ORG_BOT_USERNAME:-orgbot}
+      ORG_BOT_DEVICE_ID: ${ORG_BOT_DEVICE_ID:-FOLDFENCEORGBOT}
+      ORG_BOT_SESSION_PATH: /run/orgbot-session/orgbot-session.json
+      ORG_BOT_DISPLAY_NAME: ${ORG_BOT_DISPLAY_NAME:-Organization OrgBot}
+    volumes:
+      - ${DEMO_GENERATED_DIR:-../../internal/generated}/mas:/config:ro
+      - mas-bootstrap-data:/run/mas-bootstrap
+      - orgbot-session-data:/run/orgbot-session
+      - ../../config/seed/demo-users.json:/app/config/demo-users.json:ro
+    depends_on:
+      mas:
+        condition: service_healthy
+      synapse:
+        condition: service_healthy
+      keycloak:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "node", "-e", "const fs=require('fs'); const safe=p=>{const s=fs.lstatSync(p);return s.isFile()&&!s.isSymbolicLink()&&s.uid===process.getuid()&&(s.mode&0o777)===0o600}; try { const p=process.env.MAS_ADMIN_TOKEN_PATH; const marker=process.env.MAS_ADMIN_TOKEN_VERIFIED_PATH; if(!safe(p)||!safe(marker))process.exit(1); const age=Date.now()-fs.lstatSync(marker).mtimeMs; if(age<0||age>300000)process.exit(1); const adminToken=fs.readFileSync(p,'utf8').replace(/\\n$/,''); const sessionPath=process.env.ORG_BOT_SESSION_PATH; if(!safe(sessionPath))process.exit(1); const session=JSON.parse(fs.readFileSync(sessionPath,'utf8')); const valid=session.schema_version===1&&session.user_id==='@'+process.env.ORG_BOT_USERNAME+':'+process.env.MATRIX_SERVER_NAME&&session.device_id===process.env.ORG_BOT_DEVICE_ID&&typeof session.access_token==='string'&&session.access_token.length>=16&&session.admin===false; process.exit(adminToken.length>=16&&adminToken.length<=8192&&!/\\s/.test(adminToken)&&valid?0:1) } catch { process.exit(1) }"]
+      interval: 15s
+      timeout: 3s
+      retries: 12
+      start_period: 30s
+
+  org-bot:
+    networks: [control]
+    build:
+      context: ../..
+      dockerfile: src/org-bot/Dockerfile
+    restart: unless-stopped
+    environment:
+      ORG_BOT_HOMESERVER_URL: http://synapse:8008
+      ORG_BOT_USER_ID: "@${ORG_BOT_USERNAME:-orgbot}:${MATRIX_SERVER_NAME}"
+      ORG_BOT_DEVICE_ID: ${ORG_BOT_DEVICE_ID:-FOLDFENCEORGBOT}
+      ORG_BOT_SESSION_FILE: /run/mas-bootstrap/orgbot-session.json
+      ORG_BOT_EXPORT_TOKEN: ${ORG_BOT_EXPORT_TOKEN}
+      ORG_BOT_ROOM_MAP_PATH: /data/room-map.json
+      ORG_BOT_CHAT_POLICY_PATH: /data/chat-policy.json
+      ORG_BOT_DIRECT_ROOMS_PATH: /run/chat-guard/direct-rooms.json
+      ORG_BOT_STORE_PATH: /var/lib/orgbot
+      ORG_BOT_HTTP_PORT: "8090"
+      ORG_BOT_SYNC_STALE_SECONDS: "90"
+    volumes:
+      - org-bot-state:/var/lib/orgbot
+      - orgbot-session-data:/run/mas-bootstrap:ro
+      - policy-data:/data:ro
+      - chat-guard-data:/run/chat-guard:ro
+    depends_on:
+      synapse:
+        condition: service_healthy
+      provisioner:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8090/healthz', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+  policy-sync:
+    networks: [control]
+    build:
+      context: ../..
+      dockerfile: src/policy-sync/Dockerfile
+    restart: unless-stopped
+    environment:
+      NODE_OPTIONS: --no-experimental-sqlite
+      MATRIX_SERVER_NAME: ${MATRIX_SERVER_NAME}
+      MATRIX_SERVICE_USER_IDS: "@${ORG_BOT_USERNAME:-orgbot}:${MATRIX_SERVER_NAME}"
+      ORG_BOT_READINESS_URL: http://org-bot:8090
+      ORG_BOT_READINESS_TOKEN: ${ORG_BOT_EXPORT_TOKEN}
+      ORG_BOT_READINESS_TIMEOUT_SECONDS: "180"
+      ORG_BOT_READINESS_POLL_INTERVAL_SECONDS: "2"
+      SYNAPSE_ADMIN_USER: ${SYNAPSE_ADMIN_USER:-demo-policy-admin}
+      SYNAPSE_ADMIN_TOKEN_FILE: /run/mas-bootstrap/synapse-admin-token
+      MAS_PROVISIONER_API_URL: http://provisioner:8091
+      MAS_PROVISIONER_API_TOKEN: ${MAS_PROVISIONER_API_TOKEN}
+      KEYCLOAK_POLICY_CLIENT_SECRET: ${KEYCLOAK_POLICY_CLIENT_SECRET}
+      KEYCLOAK_PUBLIC_URL: http://keycloak:8080/auth
+      KEYCLOAK_REALM: foldfence-demo
+      KEYCLOAK_SERVICE_CLIENT_ID: matrix-policy-sync
+      KEYCLOAK_ROLE_CLIENT_ID: matrix-synapse
+      POLICY_SYNC_INTERVAL_SECONDS: "20"
+      POLICY_MIN_USERS: "22"
+      ROOM_MAP_OUTPUT: /data/room-map.json
+    volumes:
+      - ../../config/seed/demo-users.json:/app/config/demo-users.json:ro
+      - ../../config/policies/room-access.json:/app/config/room-access.json:ro
+      - policy-data:/data
+      - mas-bootstrap-data:/run/mas-bootstrap:ro
+    depends_on:
+      synapse:
+        condition: service_healthy
+      keycloak:
+        condition: service_started
+      provisioner:
+        condition: service_healthy
+      org-bot:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "const fs=require('fs'); try { const m=JSON.parse(fs.readFileSync('/data/room-map.json','utf8')); const age=Date.now()-Date.parse(m.last_reconciled_at); const minimum=Number(process.env.POLICY_MIN_USERS||22); process.exit(m.status==='ready' && Number.isInteger(m.managed_user_count) && m.managed_user_count>=minimum && Number.isFinite(age) && age<60000 ? 0 : 1) } catch { process.exit(1) }"]
+      interval: 10s
+      timeout: 5s
+      retries: 18
+      start_period: 30s
+  element-web:
+    networks: [application]
+    image: ${COMPOSE_PROJECT_NAME:-matrix-keycloak-demo}/element-web:v1.12.33-policy1
+    build:
+      context: ../..
+      dockerfile: deployment/element/Dockerfile
+    restart: unless-stopped
+    volumes:
+      - ${DEMO_GENERATED_DIR:-../../internal/generated}/element/config.json:/app/config.json:ro
+      - ${DEMO_GENERATED_DIR:-../../internal/generated}/element/brand:/app/brand:ro
+    depends_on:
+      - synapse
+
+  export-service:
+    networks: [application, control]
+    build:
+      context: ../../src/export-service
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      NODE_OPTIONS: --no-experimental-sqlite
+      PORT: "8090"
+      EXPORT_OIDC_ISSUER: ${KEYCLOAK_ISSUER_URL}
+      EXPORT_OIDC_JWKS_URL: http://keycloak:8080/auth/realms/foldfence-demo/protocol/openid-connect/certs
+      EXPORT_ALLOWED_AZP: matrix-export-client
+      EXPORT_ADMIN_ROLE: org-export-admin
+      EXPORT_ROOM_MAP_PATH: /data/room-map.json
+      EXPORT_CHAT_POLICY_PATH: /data/chat-policy.json
+      EXPORT_DIRECT_ROOMS_PATH: /run/chat-guard/direct-rooms.json
+      BOT_EXPORT_URL: http://org-bot:8090/v1/rooms/export
+      BOT_EXPORT_TOKEN: ${ORG_BOT_EXPORT_TOKEN}
+      EXPORT_AUDIT_PATH: /var/lib/export-audit/export-audit.jsonl
+    volumes:
+      - policy-data:/data:ro
+      - export-audit-data:/var/lib/export-audit
+      - chat-guard-data:/run/chat-guard:ro
+    depends_on:
+      policy-sync:
+        condition: service_healthy
+      org-bot:
+        condition: service_healthy
+      keycloak:
+        condition: service_started
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - |
+          fetch("http://127.0.0.1:8090/healthz", {
+            redirect: "error",
+            signal: AbortSignal.timeout(3000)
+          }).then(
+            response => process.exit(response.status === 200 ? 0 : 1),
+            () => process.exit(1)
+          );
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  livekit:
+    networks: [edge]
+    image: ${COMPOSE_PROJECT_NAME:-matrix-keycloak-demo}/livekit:v1.13.11-security1
+    build:
+      context: ../..
+      dockerfile: deployment/livekit/Dockerfile
+    restart: unless-stopped
+    group_add: ["${DEMO_CONFIG_GID:-65532}"]
+    command: ["--config", "/etc/livekit.yaml", "--node-ip", "${LIVEKIT_NODE_IP}"]
+    ports:
+      - "${LIVEKIT_BIND_HOST:-0.0.0.0}:${LIVEKIT_TCP_PORT:-7881}:${LIVEKIT_TCP_PORT:-7881}/tcp"
+      - "${LIVEKIT_BIND_HOST:-0.0.0.0}:${LIVEKIT_UDP_PORT:-50100}:${LIVEKIT_UDP_PORT:-50100}/udp"
+    volumes:
+      - ${DEMO_GENERATED_DIR:-../../internal/generated}/livekit/livekit.yaml:/etc/livekit.yaml:ro
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-T", "3", "-O", "/dev/null", "http://127.0.0.1:7880/"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  lk-jwt-service:
+    networks: [application]
+    image: ghcr.io/element-hq/lk-jwt-service:0.9.0@sha256:d210fd778ba38b7e42e6fc64e8a24a7d66ccc3b938fb20d73bd713224af2dfea
+    restart: unless-stopped
+    group_add: ["${DEMO_CONFIG_GID:-65532}"]
+    environment:
+      SSL_CERT_FILE: /config/ca-bundle.pem
+      LIVEKIT_JWT_PORT: "8080"
+      LIVEKIT_URL: ${LIVEKIT_PUBLIC_URL}
+      LIVEKIT_KEY: ${LIVEKIT_API_KEY}
+      LIVEKIT_SECRET: ${LIVEKIT_API_SECRET}
+      LIVEKIT_FULL_ACCESS_HOMESERVERS: ${MATRIX_SERVER_NAME}
+      LIVEKIT_HS_SERVER_NAME: ${MATRIX_SERVER_NAME}
+      LIVEKIT_AS_REGISTRATION_FILE: /config/livekit-registration.yaml
+      LIVEKIT_CS_API_URL_OVERRIDES: ${MATRIX_SERVER_NAME}=http://synapse:8008
+    volumes:
+      - ${DEMO_GENERATED_DIR:-../../internal/generated}/livekit/livekit-registration.yaml:/config/livekit-registration.yaml:ro
+      - ${DEMO_GENERATED_DIR:-../../internal/generated}/mas/mas-ca-bundle.pem:/config/ca-bundle.pem:ro
+    depends_on:
+      - livekit
+      - synapse
+
+  nginx:
+    image: ${COMPOSE_PROJECT_NAME:-matrix-keycloak-demo}/nginx:1.30.6-security1
+    build:
+      context: ../..
+      dockerfile: deployment/nginx/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "${DEMO_BIND_HOST:-0.0.0.0}:${DEMO_BIND_HTTP_PORT:-${DEMO_HTTP_PORT:-21122}}:80"
+      - "${DEMO_BIND_HOST:-0.0.0.0}:${DEMO_BIND_HTTPS_PORT:-${DEMO_HTTPS_PORT:-21123}}:443"
+    volumes:
+      - ${DEMO_GENERATED_DIR:-../../internal/generated}/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - ${DEMO_GENERATED_DIR:-../../internal/generated}/tls/fullchain.pem:/etc/nginx/certs/fullchain.pem:ro
+      - ${DEMO_GENERATED_DIR:-../../internal/generated}/tls/privkey.pem:/etc/nginx/certs/privkey.pem:ro
+      - ../../web/export-portal:/usr/share/nginx/html/export:ro
+    depends_on:
+      - element-web
+      - keycloak
+      - synapse
+      - lk-jwt-service
+      - livekit
+      - mas
+    networks:
+      edge: {}
+      application:
+        aliases:
+          - ${DEMO_HOSTNAME}
+          - ${MATRIX_AUTH_HOSTNAME:-${DEMO_HOSTNAME}}
+          - ${MATRIX_SERVER_NAME}
+
+volumes:
+  keycloak-db-data:
+  keycloak-data:
+  synapse-db-data:
+  mas-db-data:
+  synapse-data:
+  mas-bootstrap-data:
+  orgbot-session-data:
+  org-bot-state:
+  policy-data:
+  export-audit-data:
+  chat-guard-data:
+
+networks:
+  edge:
+    enable_ipv6: false
+    ipam:
+      config:
+        - subnet: ${COMPOSE_EDGE_SUBNET:-10.234.0.0/24}
+          gateway: ${COMPOSE_EDGE_GATEWAY:-10.234.0.1}
+  application:
+    internal: true
+    enable_ipv6: false
+    ipam:
+      config:
+        - subnet: ${COMPOSE_APPLICATION_SUBNET:-10.234.1.0/24}
+          gateway: ${COMPOSE_APPLICATION_GATEWAY:-10.234.1.1}
+  control:
+    internal: true
+    enable_ipv6: false
+    ipam:
+      config:
+        - subnet: ${COMPOSE_CONTROL_SUBNET:-10.234.2.0/24}
+  keycloak-data-net:
+    internal: true
+    enable_ipv6: false
+    ipam:
+      config:
+        - subnet: ${COMPOSE_KEYCLOAK_DATA_SUBNET:-10.234.10.0/28}
+  synapse-data-net:
+    internal: true
+    enable_ipv6: false
+    ipam:
+      config:
+        - subnet: ${COMPOSE_SYNAPSE_DATA_SUBNET:-10.234.11.0/28}
+  mas-data-net:
+    internal: true
+    enable_ipv6: false
+    ipam:
+      config:
+        - subnet: ${COMPOSE_MAS_DATA_SUBNET:-10.234.12.0/28}

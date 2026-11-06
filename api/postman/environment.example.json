@@ -1,0 +1,147 @@
+{
+  "id": "a8a1f842-4f77-4d15-b09a-e3eb198a04cd",
+  "name": "Matrix Keycloak Demo \u2014 local example",
+  "values": [
+    {
+      "key": "keycloak_base_url",
+      "value": "https://demo.example.invalid/auth",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "realm",
+      "value": "foldfence-demo",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "client_id",
+      "value": "matrix-synapse",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "demo_username",
+      "value": "demo-new",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "display_name",
+      "value": "Demo New",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "clearance",
+      "value": "intern",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "role_name",
+      "value": "room.pummel.reader",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "role_uuid",
+      "value": "",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "client_uuid",
+      "value": "",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "user_uuid",
+      "value": "",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "admin_username",
+      "value": "demo-admin-01",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "admin_password",
+      "value": "",
+      "type": "secret",
+      "enabled": true
+    },
+    {
+      "key": "admin_access_token",
+      "value": "",
+      "type": "secret",
+      "enabled": true
+    },
+    {
+      "key": "new_password",
+      "value": "",
+      "type": "secret",
+      "enabled": true
+    },
+    {
+      "key": "policy_group_prefix",
+      "value": "1to1chat.",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "policy_group_name",
+      "value": "1to1chat.example-scope",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "policy_group_id",
+      "value": "",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "group_first",
+      "value": "0",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "group_page_size",
+      "value": "100",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "matrix_access_role_name",
+      "value": "",
+      "enabled": true
+    },
+    {
+      "key": "matrix_access_role_uuid",
+      "value": "",
+      "enabled": true
+    },
+    {
+      "key": "matrix_access_target_user_uuid",
+      "value": "",
+      "enabled": true
+    },
+    {
+      "key": "matrix_access_target_username",
+      "value": "",
+      "enabled": true
+    },
+    {
+      "key": "matrix_access_revocation_requested",
+      "value": "",
+      "enabled": true
+    }
+  ],
+  "_postman_variable_scope": "environment",
+  "_postman_exported_using": "Postman/11"
+}

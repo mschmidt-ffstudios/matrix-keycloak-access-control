@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "client_id": "matrix-export-client",
+  "realm_roles": ["org-export-admin"],
+  "protocol_mappers": [
+    {
+      "name": "export-audit-subject",
+      "protocol": "openid-connect",
+      "protocolMapper": "oidc-sub-mapper",
+      "consentRequired": false,
+      "config": {
+        "access.token.claim": "true",
+        "introspection.token.claim": "false"
+      }
+    },
+    {
+      "name": "scoped-export-administration-role",
+      "protocol": "openid-connect",
+      "protocolMapper": "oidc-usermodel-realm-role-mapper",
+      "consentRequired": false,
+      "config": {
+        "claim.name": "realm_access.roles",
+        "jsonType.label": "String",
+        "multivalued": "true",
+        "access.token.claim": "true",
+        "introspection.token.claim": "false",
+        "id.token.claim": "false",
+        "userinfo.token.claim": "false"
+      }
+    }
+  ]
+}

@@ -1,0 +1,167 @@
+{
+  "schema_version": 1,
+  "status": "demo-policy-v1",
+  "default_decision": "deny",
+  "direct_chats": {
+    "group_prefix": "1to1chat.",
+    "snapshot_ttl_seconds": 60,
+    "membership_rule": "shared_exact_keycloak_group",
+    "require_orgbot": true,
+    "allow_user_created_group_rooms": false
+  },
+  "clearance_levels": [
+    {
+      "id": "basis",
+      "rank": 0
+    },
+    {
+      "id": "intern",
+      "rank": 1
+    },
+    {
+      "id": "vertraulich",
+      "rank": 2
+    },
+    {
+      "id": "streng_vertraulich",
+      "rank": 3
+    }
+  ],
+  "roles": [
+    "reader",
+    "writer",
+    "moderator"
+  ],
+  "keycloak_role_pattern": "room.{room_id}.{role}",
+  "checks": [
+    "clearance_at_least_room_minimum",
+    "explicit_room_role"
+  ],
+  "revocation_action": "remove_room_membership",
+  "sync_interval_seconds": 20,
+  "classification_note": "Clearance controls room admission. All demo rooms use the same Matrix E2EE algorithm; labels do not represent different cryptographic strength.",
+  "matrix_power_levels": {
+    "users_default": 0,
+    "events_default": 100,
+    "state_default": 100,
+    "invite": 100,
+    "kick": 100,
+    "ban": 100,
+    "redact": 50,
+    "events": {
+      "m.room.message": 10,
+      "m.room.encrypted": 10,
+      "m.reaction": 10,
+      "org.matrix.msc3401.call.member": 10,
+      "m.room.redaction": 50,
+      "m.room.power_levels": 100,
+      "m.room.encryption": 100,
+      "m.room.join_rules": 100,
+      "m.room.history_visibility": 100,
+      "m.room.member": 100,
+      "m.room.name": 100,
+      "m.room.topic": 100
+    }
+  },
+  "role_power_levels": {
+    "reader": 0,
+    "writer": 10,
+    "moderator": 50
+  },
+  "rooms": [
+    {
+      "id": "allgemein",
+      "name": "Allgemein",
+      "alias_localpart": "allgemein",
+      "minimum_clearance": "basis",
+      "encrypted": true,
+      "join_rule": "invite",
+      "history_visibility": "joined"
+    },
+    {
+      "id": "pummel",
+      "name": "Pummel",
+      "alias_localpart": "pummel",
+      "minimum_clearance": "intern",
+      "encrypted": true,
+      "join_rule": "invite",
+      "history_visibility": "joined"
+    },
+    {
+      "id": "speicher",
+      "name": "Speicher",
+      "alias_localpart": "speicher",
+      "minimum_clearance": "vertraulich",
+      "encrypted": true,
+      "join_rule": "invite",
+      "history_visibility": "joined"
+    },
+    {
+      "id": "leitung",
+      "name": "Leitung",
+      "alias_localpart": "leitung",
+      "minimum_clearance": "streng_vertraulich",
+      "encrypted": true,
+      "join_rule": "invite",
+      "history_visibility": "joined"
+    },
+    {
+      "id": "abteilung_x",
+      "name": "Abteilung X",
+      "alias_localpart": "abteilung-x",
+      "minimum_clearance": "basis",
+      "encrypted": true,
+      "join_rule": "invite",
+      "history_visibility": "joined"
+    },
+    {
+      "id": "abteilung_y",
+      "name": "Abteilung Y",
+      "alias_localpart": "abteilung-y",
+      "minimum_clearance": "basis",
+      "encrypted": true,
+      "join_rule": "invite",
+      "history_visibility": "joined"
+    },
+    {
+      "id": "export_test_allgemein",
+      "name": "[EXPORT TEST] Allgemein",
+      "alias_localpart": "export-test-allgemein",
+      "minimum_clearance": "basis",
+      "encrypted": true,
+      "join_rule": "invite",
+      "history_visibility": "joined",
+      "test_only": true
+    },
+    {
+      "id": "export_test_pummel",
+      "name": "[EXPORT TEST] Pummel",
+      "alias_localpart": "export-test-pummel",
+      "minimum_clearance": "basis",
+      "encrypted": true,
+      "join_rule": "invite",
+      "history_visibility": "joined",
+      "test_only": true
+    },
+    {
+      "id": "export_test_speicher",
+      "name": "[EXPORT TEST] Speicher",
+      "alias_localpart": "export-test-speicher",
+      "minimum_clearance": "basis",
+      "encrypted": true,
+      "join_rule": "invite",
+      "history_visibility": "joined",
+      "test_only": true
+    },
+    {
+      "id": "export_test_leitung",
+      "name": "[EXPORT TEST] Leitung",
+      "alias_localpart": "export-test-leitung",
+      "minimum_clearance": "basis",
+      "encrypted": true,
+      "join_rule": "invite",
+      "history_visibility": "joined",
+      "test_only": true
+    }
+  ]
+}

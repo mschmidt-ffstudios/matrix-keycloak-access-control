@@ -1,0 +1,76 @@
+# Rendered by deployment/synapse/render-homeserver.py into the private data volume.
+server_name: "${MATRIX_SERVER_NAME}"
+app_service_config_files:
+  - /config/livekit-registration.yaml
+public_baseurl: "${MATRIX_PUBLIC_URL}/"
+pid_file: /data/homeserver.pid
+web_client_location: "${MATRIX_PUBLIC_URL}/"
+signing_key_path: /data/signing.key
+media_store_path: /data/media_store
+report_stats: false
+enable_registration: false
+modules:
+  - module: foldfence_chat_policy.RoomGuard
+    config:
+      server_name: "${MATRIX_SERVER_NAME}"
+      admin_user_id: "@${SYNAPSE_ADMIN_USER}:${MATRIX_SERVER_NAME}"
+      bot_user_id: "@${ORG_BOT_USERNAME}:${MATRIX_SERVER_NAME}"
+      signing_secret: "${SYNAPSE_CHAT_POLICY_SECRET}"
+      snapshot_path: /policy/chat-policy.json
+      join_snapshot_path: /policy/join-policy.json
+      registry_path: /chat-guard/direct-rooms.json
+macaroon_secret_key: "${SYNAPSE_MACAROON_SECRET}"
+form_secret: "${SYNAPSE_FORM_SECRET}"
+max_upload_size: 50M
+url_preview_enabled: false
+suppress_key_server_warning: true
+trusted_key_servers: []
+
+database:
+  name: psycopg2
+  args:
+    user: synapse
+    password: "${SYNAPSE_DB_PASSWORD}"
+    database: synapse
+    host: synapse-db
+    port: 5432
+    cp_min: 5
+    cp_max: 10
+
+listeners:
+  - port: 8008
+    tls: false
+    type: http
+    x_forwarded: true
+    bind_addresses: ["0.0.0.0"]
+    resources:
+      - names: [client]
+        compress: false
+      - names: [openid]
+        compress: false
+
+matrix_authentication_service:
+  enabled: true
+  endpoint: http://mas:8080/
+  secret: "${MAS_SYNAPSE_SHARED_SECRET}"
+
+experimental_features:
+  msc3266_enabled: true
+  msc4143_enabled: true
+  msc4222_enabled: true
+  msc4502_enabled: true
+  msc4512_enabled: true
+
+max_event_delay_duration: 24h
+rc_message:
+  per_second: 0.5
+  burst_count: 30
+rc_delayed_event_mgmt:
+  per_second: 1
+  burst_count: 20
+
+matrix_rtc:
+  transports:
+    - type: livekit
+      url: "${LIVEKIT_PUBLIC_URL}"
+      livekit_service_url: "${LIVEKIT_JWT_PUBLIC_URL}"

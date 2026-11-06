@@ -1,0 +1,660 @@
+{
+  "info": {
+    "name": "Matrix Keycloak Demo \u2014 Users, Room Roles, and Direct-chat Groups",
+    "description": "Manage synthetic demo users and their Matrix room client roles through Keycloak Admin REST. Import the secret-free environment example and fill credentials locally.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{admin_access_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "keycloak_base_url",
+      "value": "https://demo.example.invalid/auth"
+    },
+    {
+      "key": "realm",
+      "value": "foldfence-demo"
+    },
+    {
+      "key": "client_id",
+      "value": "matrix-synapse"
+    },
+    {
+      "key": "demo_username",
+      "value": "demo-new"
+    },
+    {
+      "key": "display_name",
+      "value": "Demo New"
+    },
+    {
+      "key": "clearance",
+      "value": "intern"
+    },
+    {
+      "key": "role_name",
+      "value": "room.pummel.reader"
+    },
+    {
+      "key": "role_uuid",
+      "value": ""
+    },
+    {
+      "key": "client_uuid",
+      "value": ""
+    },
+    {
+      "key": "user_uuid",
+      "value": ""
+    },
+    {
+      "key": "admin_username",
+      "value": "demo-admin-01"
+    },
+    {
+      "key": "admin_password",
+      "value": ""
+    },
+    {
+      "key": "admin_access_token",
+      "value": ""
+    },
+    {
+      "key": "new_password",
+      "value": ""
+    },
+    {
+      "key": "matrix_access_role_name",
+      "value": ""
+    },
+    {
+      "key": "matrix_access_role_uuid",
+      "value": ""
+    },
+    {
+      "key": "matrix_access_target_user_uuid",
+      "value": ""
+    },
+    {
+      "key": "matrix_access_target_username",
+      "value": ""
+    },
+    {
+      "key": "matrix_access_revocation_requested",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Authenticate Keycloak admin",
+      "request": {
+        "method": "POST",
+        "auth": {
+          "type": "noauth"
+        },
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/x-www-form-urlencoded"
+          }
+        ],
+        "body": {
+          "mode": "urlencoded",
+          "urlencoded": [
+            {
+              "key": "grant_type",
+              "value": "password",
+              "type": "text"
+            },
+            {
+              "key": "client_id",
+              "value": "admin-cli",
+              "type": "text"
+            },
+            {
+              "key": "username",
+              "value": "{{admin_username}}",
+              "type": "text"
+            },
+            {
+              "key": "password",
+              "value": "{{admin_password}}",
+              "type": "text"
+            }
+          ]
+        },
+        "url": "{{keycloak_base_url}}/realms/{{realm}}/protocol/openid-connect/token"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('admin token was issued', function () { pm.response.to.have.status(200); });",
+              "const data = pm.response.json();",
+              "if (!data.access_token) throw new Error('No access token returned');",
+              "pm.environment.set('admin_access_token', data.access_token);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Find Matrix Synapse client",
+      "request": {
+        "method": "GET",
+        "url": "{{keycloak_base_url}}/admin/realms/{{realm}}/clients?clientId={{client_id}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('one Matrix client found', function () { pm.response.to.have.status(200); });",
+              "const matches = pm.response.json().filter((client) => client.clientId === pm.environment.get('client_id'));",
+              "if (matches.length !== 1 || !matches[0].id) throw new Error('Expected exactly one Matrix client');",
+              "pm.environment.set('client_uuid', matches[0].id);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Create demo user",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"username\": \"{{demo_username}}\",\n  \"enabled\": true,\n  \"firstName\": \"{{demo_first_name}}\",\n  \"lastName\": \"{{demo_last_name}}\",\n  \"attributes\": {\n    \"security_clearance\": [\n      \"{{clearance}}\"\n    ]\n  },\n  \"credentials\": [\n    {\n      \"type\": \"password\",\n      \"value\": \"{{new_password}}\",\n      \"temporary\": false\n    }\n  ],\n  \"email\": \"{{demo_username}}@foldfence-demo.invalid\"\n}"
+        },
+        "url": "{{keycloak_base_url}}/admin/realms/{{realm}}/users"
+      },
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "if (!/^demo-[a-z0-9][a-z0-9-]*$/.test(pm.environment.get('demo_username') || '')) throw new Error('Only synthetic demo-* usernames are allowed');",
+              "const fullName = (pm.environment.get('display_name') || '').trim();",
+              "if (!fullName) throw new Error('A synthetic display name is required');",
+              "const names = fullName.split(/\\s+/);",
+              "pm.variables.set('demo_first_name', names.shift());",
+              "pm.variables.set('demo_last_name', names.join(' ') || 'Demo');"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('user created (or already exists)', function () { pm.expect([201, 409]).to.include(pm.response.code); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Find demo user (stores user UUID)",
+      "request": {
+        "method": "GET",
+        "url": "{{keycloak_base_url}}/admin/realms/{{realm}}/users?username={{demo_username}}&exact=true"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('demo user found', function () { pm.response.to.have.status(200); });",
+              "const users = pm.response.json().filter((user) => user.username === pm.environment.get('demo_username'));",
+              "if (users.length !== 1 || !users[0].id) throw new Error('Expected exactly one demo user');",
+              "pm.environment.set('user_uuid', users[0].id);",
+              "pm.environment.unset('matrix_access_target_username');",
+              "pm.environment.unset('matrix_access_target_user_uuid');",
+              "if (/^demo-[a-z0-9][a-z0-9-]*$/.test(users[0].username) && !/^demo-admin-/.test(users[0].username) && users[0].username !== 'demo-policy-admin' && !users[0].serviceAccountClientId) {",
+              "  pm.environment.set('matrix_access_target_username', users[0].username);",
+              "  pm.environment.set('matrix_access_target_user_uuid', users[0].id);",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Update display name and clearance",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"username\": \"{{demo_username}}\",\n  \"enabled\": true,\n  \"firstName\": \"{{demo_first_name}}\",\n  \"lastName\": \"{{demo_last_name}}\",\n  \"attributes\": {\n    \"security_clearance\": [\n      \"{{clearance}}\"\n    ]\n  },\n  \"email\": \"{{demo_username}}@foldfence-demo.invalid\"\n}"
+        },
+        "url": "{{keycloak_base_url}}/admin/realms/{{realm}}/users/{{user_uuid}}"
+      },
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "if (!/^demo-[a-z0-9][a-z0-9-]*$/.test(pm.environment.get('demo_username') || '')) throw new Error('Only synthetic demo-* usernames are allowed');",
+              "const fullName = (pm.environment.get('display_name') || '').trim();",
+              "if (!fullName) throw new Error('A synthetic display name is required');",
+              "const names = fullName.split(/\\s+/);",
+              "pm.variables.set('demo_first_name', names.shift());",
+              "pm.variables.set('demo_last_name', names.join(' ') || 'Demo');"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. Set demo user password",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"type\": \"password\",\n  \"value\": \"{{new_password}}\",\n  \"temporary\": false\n}"
+        },
+        "url": "{{keycloak_base_url}}/admin/realms/{{realm}}/users/{{user_uuid}}/reset-password"
+      },
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "if (!/^demo-[a-z0-9][a-z0-9-]*$/.test(pm.environment.get('demo_username') || '')) throw new Error('Only synthetic demo-* usernames are allowed');"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "7. Find room role (stores role UUID)",
+      "request": {
+        "method": "GET",
+        "url": "{{keycloak_base_url}}/admin/realms/{{realm}}/clients/{{client_uuid}}/roles/{{role_name}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const allowed = /^room\\.(allgemein|pummel|speicher|leitung|abteilung_x|abteilung_y)\\.(reader|writer|moderator)$/;",
+              "if (!allowed.test(pm.environment.get('role_name') || '')) throw new Error('Only managed demo room roles are allowed');",
+              "pm.test('room role found', function () { pm.response.to.have.status(200); });",
+              "const role = pm.response.json();",
+              "if (!role.id) throw new Error('Role UUID missing');",
+              "pm.environment.set('role_uuid', role.id);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "8. Add room role",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "[{\n  \"id\": \"{{role_uuid}}\",\n  \"name\": \"{{role_name}}\",\n  \"clientRole\": true,\n  \"containerId\": \"{{client_uuid}}\"\n}]"
+        },
+        "url": "{{keycloak_base_url}}/admin/realms/{{realm}}/users/{{user_uuid}}/role-mappings/clients/{{client_uuid}}"
+      },
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "if (!/^demo-[a-z0-9][a-z0-9-]*$/.test(pm.environment.get('demo_username') || '')) throw new Error('Only synthetic demo-* usernames are allowed');",
+              "if (!/^room\\.(allgemein|pummel|speicher|leitung|abteilung_x|abteilung_y)\\.(reader|writer|moderator)$/.test(pm.environment.get('role_name') || '')) throw new Error('Only managed demo room roles are allowed');"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "9. Remove room role",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "[{\n  \"id\": \"{{role_uuid}}\",\n  \"name\": \"{{role_name}}\",\n  \"clientRole\": true,\n  \"containerId\": \"{{client_uuid}}\"\n}]"
+        },
+        "url": "{{keycloak_base_url}}/admin/realms/{{realm}}/users/{{user_uuid}}/role-mappings/clients/{{client_uuid}}"
+      },
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "if (!/^demo-[a-z0-9][a-z0-9-]*$/.test(pm.environment.get('demo_username') || '')) throw new Error('Only synthetic demo-* usernames are allowed');",
+              "if (!/^room\\.(allgemein|pummel|speicher|leitung|abteilung_x|abteilung_y)\\.(reader|writer|moderator)$/.test(pm.environment.get('role_name') || '')) throw new Error('Only managed demo room roles are allowed');"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Direct-chat policy groups",
+      "item": [
+        {
+          "name": "List policy groups (page; advances offset)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const groups = pm.response.json();",
+                  "const prefix = pm.environment.get(\"policy_group_prefix\") || \"1to1chat.\"; ",
+                  "const targetName = pm.environment.get(\"policy_group_name\") || \"\";",
+                  "const first = Number(pm.environment.get(\"group_first\") || 0);",
+                  "const pageSize = Number(pm.environment.get(\"group_page_size\") || 100);",
+                  "pm.test(\"Keycloak returned a group page\", () => pm.expect(Array.isArray(groups)).to.eql(true));",
+                  "const policyGroups = groups.filter((group) => typeof group.name === \"string\" && group.name.startsWith(prefix) && group.name.length > prefix.length && group.path === \"/\" + group.name);",
+                  "pm.environment.set(\"policy_group_page\", JSON.stringify(policyGroups.map(({id, name, path}) => ({id, name, path}))));",
+                  "const match = policyGroups.find((group) => group.name === targetName);",
+                  "pm.environment.set(\"policy_group_id\", match ? match.id : \"\");",
+                  "pm.environment.set(\"group_first\", String(groups.length === pageSize ? first + pageSize : 0));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{keycloak_base_url}}/admin/realms/{{realm}}/groups?first={{group_first}}&max={{group_page_size}}&briefRepresentation=false",
+            "description": "Reads one paginated top-level group page. The test script advances group_first when the page is full and captures the exact UUID for policy_group_name when it appears."
+          },
+          "response": []
+        },
+        {
+          "name": "Create top-level direct-chat policy group",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const name = pm.environment.get(\"policy_group_name\") || \"\";",
+                  "const prefix = pm.environment.get(\"policy_group_prefix\") || \"1to1chat.\"; ",
+                  "const suffix = name.startsWith(prefix) ? name.slice(prefix.length) : \"\";",
+                  "if (!suffix.trim() || name.includes(\"/\")) throw new Error(\"Set a top-level group name with the configured 1to1chat. prefix and a non-empty scope.\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Keycloak created the policy group\", () => pm.expect(pm.response.code).to.eql(201));",
+                  "const location = pm.response.headers.get(\"Location\") || \"\";",
+                  "const match = location.match(/\\/groups\\/([^/?]+)\\/?$/);",
+                  "if (match) pm.environment.set(\"policy_group_id\", decodeURIComponent(match[1]));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"{{policy_group_name}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{keycloak_base_url}}/admin/realms/{{realm}}/groups",
+            "description": "Creates only a top-level group in the configured direct-chat namespace. Run the list request first when checking whether the name already exists."
+          },
+          "response": []
+        },
+        {
+          "name": "Add demo user to policy group",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.environment.get(\"user_uuid\")) throw new Error(\"Run Find demo user first to populate user_uuid.\");",
+                  "if (!pm.environment.get(\"policy_group_id\")) throw new Error(\"Run List policy groups or Create policy group to populate the exact policy_group_id.\");"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": "{{keycloak_base_url}}/admin/realms/{{realm}}/users/{{user_uuid}}/groups/{{policy_group_id}}",
+            "description": "Adds membership by the exact Keycloak user UUID and group UUID. This endpoint does not change room-role mappings."
+          },
+          "response": []
+        },
+        {
+          "name": "Remove demo user from policy group",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.environment.get(\"user_uuid\")) throw new Error(\"Run Find demo user first to populate user_uuid.\");",
+                  "if (!pm.environment.get(\"policy_group_id\")) throw new Error(\"Run List policy groups to populate the exact policy_group_id.\");"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{keycloak_base_url}}/admin/realms/{{realm}}/users/{{user_uuid}}/groups/{{policy_group_id}}",
+            "description": "Removes membership by the exact Keycloak user UUID and group UUID. This endpoint does not change room-role mappings."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Matrix application access",
+      "description": "Separate opt-in realm entitlement. Create user does not grant Matrix access. Find the exact user and role, then grant explicitly. Revoke removes only this role and checks inherited grants. Policy-sync automatically locks MAS and revokes Matrix sessions; verify convergence. Other Keycloak applications and SSO sessions remain unchanged.",
+      "item": [
+        {
+          "name": "Find Matrix access role",
+          "request": {
+            "method": "GET",
+            "url": "{{keycloak_base_url}}/admin/realms/{{realm}}/roles/matrix-access"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.response.to.have.status(200);",
+                  "const role = pm.response.json();",
+                  "if (role.name !== 'matrix-access' || role.clientRole !== false || !role.id) throw new Error('Expected the exact matrix-access realm role');",
+                  "pm.environment.set('matrix_access_role_uuid', role.id);",
+                  "pm.environment.set('matrix_access_role_name', role.name);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Grant Matrix access",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "[{\"id\":\"{{matrix_access_role_uuid}}\",\"name\":\"matrix-access\",\"clientRole\":false}]"
+            },
+            "url": "{{keycloak_base_url}}/admin/realms/{{realm}}/users/{{user_uuid}}/role-mappings/realm"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const name = pm.environment.get('demo_username') || '';",
+                  "if (!/^demo-[a-z0-9][a-z0-9-]*$/.test(name) || /^demo-admin-/.test(name) || name === 'demo-policy-admin') throw new Error('Matrix access is limited to ordinary synthetic demo users');",
+                  "if (pm.environment.get('matrix_access_target_username') !== name || pm.environment.get('matrix_access_target_user_uuid') !== pm.environment.get('user_uuid')) throw new Error('Run Find demo user for this exact target first');",
+                  "if (pm.environment.get('matrix_access_role_name') !== 'matrix-access' || !pm.environment.get('matrix_access_role_uuid')) throw new Error('Run Find Matrix access role first');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.response.to.have.status(204);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Revoke Matrix access",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "[{\"id\":\"{{matrix_access_role_uuid}}\",\"name\":\"matrix-access\",\"clientRole\":false}]"
+            },
+            "url": "{{keycloak_base_url}}/admin/realms/{{realm}}/users/{{user_uuid}}/role-mappings/realm"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const name = pm.environment.get('demo_username') || '';",
+                  "if (!/^demo-[a-z0-9][a-z0-9-]*$/.test(name) || /^demo-admin-/.test(name) || name === 'demo-policy-admin') throw new Error('Matrix access is limited to ordinary synthetic demo users');",
+                  "if (pm.environment.get('matrix_access_target_username') !== name || pm.environment.get('matrix_access_target_user_uuid') !== pm.environment.get('user_uuid')) throw new Error('Run Find demo user for this exact target first');",
+                  "if (pm.environment.get('matrix_access_role_name') !== 'matrix-access' || !pm.environment.get('matrix_access_role_uuid')) throw new Error('Run Find Matrix access role first');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.environment.set('matrix_access_revocation_requested', false);",
+                  "pm.response.to.have.status(204);",
+                  "const headers = {Authorization: 'Bearer ' + pm.environment.get('admin_access_token')};",
+                  "const url = pm.variables.replaceIn('{{keycloak_base_url}}/admin/realms/{{realm}}/users/{{user_uuid}}/role-mappings/realm/composite');",
+                  "pm.sendRequest({url, method: 'GET', header: headers}, function (error, response) {",
+                  "  pm.test('No effective or inherited Matrix access remains', function () {",
+                  "    if (error) throw new Error('Could not verify the effective entitlement');",
+                  "    pm.expect(response.code).to.eql(200);",
+                  "    const roles = response.json();",
+                  "    if (!Array.isArray(roles) || roles.some(role => role.name === 'matrix-access')) throw new Error('Remove inherited matrix-access grants before claiming revocation');",
+                  "    pm.environment.set('matrix_access_revocation_requested', true);",
+                  "  });",
+                  "});",
+                  "// This intentionally does not log out Keycloak. Await automatic MAS lock/session",
+                  "// revocation by policy-sync and verify Matrix access and refresh denial."
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Inspect effective Matrix access",
+          "request": {
+            "method": "GET",
+            "url": "{{keycloak_base_url}}/admin/realms/{{realm}}/users/{{user_uuid}}/role-mappings/realm/composite"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const name = pm.environment.get('demo_username') || '';",
+                  "if (!/^demo-[a-z0-9][a-z0-9-]*$/.test(name) || /^demo-admin-/.test(name) || name === 'demo-policy-admin') throw new Error('Matrix access is limited to ordinary synthetic demo users');"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

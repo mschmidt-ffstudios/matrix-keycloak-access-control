@@ -1,0 +1,53 @@
+@startuml
+title Room Access and Monitored 1:1 Chat Policy
+skinparam shadowing false
+skinparam defaultTextAlignment center
+skinparam activity {
+  BackgroundColor #F8FAFC
+  BorderColor #334155
+  DiamondBackgroundColor #FFF7D6
+  DiamondBorderColor #A16207
+}
+
+start
+:Policy Sync reads Keycloak users, effective Matrix entitlement,\nclearance, room roles and direct group memberships;
+:Require current Matrix entitlement and a recognized clearance;
+if (Configured managed room?) then (yes)
+  :Require clearance rank >= room minimum;
+  :Require exactly one explicit room role;
+  :Join OrgBot at PL 0 and check its authenticated readiness;
+  :Set membership and Matrix power level;
+  note right
+    Clearance: basis < intern < vertraulich < streng_vertraulich.
+    Role power: reader 0, writer 10, moderator 50.
+    Rooms are invite-only, joined-history and Megolm encrypted.
+    Clearance labels do not change E2EE strength.
+  end note
+else (direct chat)
+  :Require both users share the same exact group ID;
+  :Require group name prefix `1to1chat.`;
+  :Create private non-federated room with signed pair marker;
+  :Invite OrgBot and peer; require Megolm and joined Bot;
+endif
+:Synapse rechecks current policy and room state on each action;
+if (Current authorization and required room state valid?) then (yes)
+  :Allow only the actions granted by room power / pair policy;
+else (no)
+  :Deny new access or actions;
+endif
+stop
+
+note right
+  Ordinary organization/department groups grant no 1:1 access.
+  Nested-group inheritance and the `m.direct` client hint are
+  not authorization. Missing or expired policy fails closed;
+  revocation removes known unauthorized room memberships.
+  Bot readiness/membership does not prove every decryption key.
+
+  The MAS-specific Keycloak flow requires `matrix-access`.
+  Current policy snapshots carry that grant for room and
+  export authorization.
+  Verify the configured mappings and enforcement for each
+  deployment.
+end note
+@enduml

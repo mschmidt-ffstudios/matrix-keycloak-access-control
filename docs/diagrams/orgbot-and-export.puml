@@ -1,0 +1,49 @@
+@startuml
+title E2EE OrgBot and Protected Export
+skinparam shadowing false
+skinparam defaultTextAlignment center
+skinparam activity {
+  BackgroundColor #F8FAFC
+  BorderColor #334155
+  DiamondBackgroundColor #FFF7D6
+  DiamondBorderColor #A16207
+}
+
+start
+:Export administrator selects room scope;
+:Export page signs in through Keycloak using OIDC + PKCE;
+:Export Service verifies signed claims using Keycloak JWKS;
+:Reload current room map and authorization policy;
+if (matrix-access, org-export-admin and current requested scope allowed?) then (yes)
+  :Send exact room IDs to OrgBot over its private endpoint;
+  :OrgBot uses content from its continuous non-admin Matrix sync;
+  note right
+    OrgBot is joined to approved encrypted rooms as a PL 0
+    participant and uses its own persistent E2EE device store.
+    Its session-only volume is separate from the Policy Sync
+    administrator-token volume. OrgBot has no room-admin role.
+
+    Policy Sync's private administrator creates managed rooms
+    and controls membership/security state, not E2EE content.
+    In v12 the creator has immutable power and is absent from
+    the power-level `users` map. For v11 with a power-level
+    event, creator power is `users[creator]` or `users_default`.
+  end note
+  :Decrypt only content available to OrgBot's own device;
+  :Package observed events and available attachments in a ZIP;
+  :Recheck current actor, entitlement and exact scope before delivery;
+  :Return archive, completeness status and audit digest;
+else (no)
+  :Reject before requesting content from OrgBot;
+endif
+stop
+
+note right
+  Archives describe observed/decrypted content. Missing history,
+  keys or media remain visible as gaps; current status is partial.
+
+  Verify encrypted messages and attachments with a synthetic
+  end-to-end fixture. The bot does not backfill history, and an
+  archive can be partial even when its ZIP is valid.
+end note
+@enduml

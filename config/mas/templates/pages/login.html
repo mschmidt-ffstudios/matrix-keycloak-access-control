@@ -1,0 +1,43 @@
+{# Browser sign-in stays on the configured upstream identity provider. #}
+{% extends "base.html" %}
+
+{% from "components/idp_brand.html" import logo %}
+
+{% block content %}
+  <main class="flex flex-col gap-10">
+    <header class="page-heading">
+      <div class="icon">
+        {{ icon.user_profile_solid() }}
+      </div>
+      <div class="header">
+        <h1 class="title">{{ _("mas.login.headline") }}</h1>
+        <p class="text">{{ _("mas.login.description") }}</p>
+      </div>
+    </header>
+
+    {% if form.errors is not empty %}
+      {% for error in form.errors %}
+        <div class="text-critical font-medium">
+          {{ errors.form_error_message(error=error) }}
+        </div>
+      {% endfor %}
+    {% endif %}
+
+    <div class="cpd-form-root">
+      {% if providers %}
+        {% set params = next["params"] | default({}) | to_params(prefix="?") %}
+        {% for provider in providers %}
+          {% set name = provider.human_name or (provider.issuer | simplify_url(keep_path=True)) or provider.id %}
+          <a class="cpd-button{% if provider.brand_name %} has-icon{% endif %}" data-kind="secondary" data-size="lg" href="{{ ('/upstream/authorize/' ~ provider.id ~ params) | prefix_url }}">
+            {{ logo(provider.brand_name) }}
+            {{ _("mas.login.continue_with_provider", provider=name) }}
+          </a>
+        {% endfor %}
+      {% else %}
+        <div class="text-center">
+          {{ _("mas.login.no_login_methods") }}
+        </div>
+      {% endif %}
+    </div>
+  </main>
+{% endblock content %}

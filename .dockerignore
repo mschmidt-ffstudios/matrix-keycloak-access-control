@@ -1,0 +1,12 @@
+.git
+.agents
+.codex
+.env
+.env.*
+!.env.example
+internal
+**/node_modules
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
+.DS_Store

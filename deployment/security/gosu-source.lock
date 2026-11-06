@@ -1,0 +1,7 @@
+Upstream: https://github.com/tianon/gosu
+Release tag: 1.20
+Commit: 29b939aa5bd4dc588af765b8248f6e39150d2565
+Build toolchain: Go 1.27.3, immutable official image digest in Dockerfiles.
+Module overlay: gosu.go.mod and gosu.go.sum, x/sys v0.44.0 and opencontainers/user v0.4.1.
+Verification: go mod download, go mod verify, go build -mod=readonly.
+Target tested: linux/amd64; CGO_ENABLED=0.
